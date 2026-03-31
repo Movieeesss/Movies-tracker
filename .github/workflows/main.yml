@@ -1,0 +1,30 @@
+name: Steel and Movie Bot Automation
+on:
+  repository_dispatch:
+    types: [trigger_bot, trigger_movie]  # Intha rendu trigger-um working-la irukkum
+  workflow_dispatch:                      # Manual button-um irukkum
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
+      - name: Install Dependencies
+        run: pip install requests beautifulsoup4
+
+      # --- STEEL BOT LOGIC ---
+      - name: Run Steel Bot
+        if: github.event.action == 'trigger_bot'
+        run: python bot.py
+
+      # --- MOVIE BOT LOGIC ---
+      - name: Run Movie Bot
+        if: github.event.action == 'trigger_movie'
+        run: python movies.py
