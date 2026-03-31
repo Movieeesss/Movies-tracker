@@ -1,8 +1,11 @@
-name: Steel and Movie Bot Automation
+name: 5-Minute Steel and Movie Bot
 on:
+  schedule:
+    # Intha line ovvoru 5 nimishathukkum automatic-ah trigger pannum
+    - cron: '*/5 * * * *'
   repository_dispatch:
-    types: [trigger_bot, trigger_movie]  # Intha rendu trigger-um working-la irukkum
-  workflow_dispatch:                      # Manual button-um irukkum
+    types: [trigger_bot, trigger_movie]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -19,12 +22,11 @@ jobs:
       - name: Install Dependencies
         run: pip install requests beautifulsoup4
 
-      # --- STEEL BOT LOGIC ---
+      # --- RUN BOTH BOTS EVERY 5 MINS ---
+      # Schedule moolama varum pothu rendu python files-um run aagum
+      
       - name: Run Steel Bot
-        if: github.event.action == 'trigger_bot'
         run: python bot.py
 
-      # --- MOVIE BOT LOGIC ---
       - name: Run Movie Bot
-        if: github.event.action == 'trigger_movie'
         run: python movies.py
