@@ -1,97 +1,78 @@
-import requests
+import time
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
+import requests
 from datetime import datetime, timedelta
 
-# --- BOT CONFIGURATION ---
-# Unga puthu Movie Bot Token and Chat ID
+# --- CONFIG ---
 TOKEN = "8745585993:AAE2zRpimM9_VW9YK0I7FhDmvHb7iy1tw9A"
 CHAT_ID = "1115358053"
 
-def get_la_maris_shows():
-    """
-    Direct scraping on GitHub Actions usually gets blocked by BMS.
-    Using a robust header and providing direct booking links for accuracy.
-    """
+def get_bms_live_data():
     ist_now = datetime.utcnow() + timedelta(hours=5, minutes=30)
     date_str = ist_now.strftime("%Y%m%d")
-    
-    # Target URL for LA Cinemas Maris Trichy
     url = f"https://in.bookmyshow.com/buytickets/la-cinemas-maris-trichy/cinema-trich-LATG-MT/{date_str}"
     
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Referer': 'https://in.bookmyshow.com/trichy'
-    }
-    
+    # Chrome Options for GitHub Actions (Headless)
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--window-size=1920,1080")
+    chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+
     movie_list = []
-    
+    driver = None
+
     try:
-        # Request with timeout to avoid hanging
-        response = requests.get(url, headers=headers, timeout=20)
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+        driver.get(url)
+        time.sleep(10) # Wait for JavaScript to load movie data
         
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
-            listings = soup.find_all('li', class_='list')
-            
-            for item in listings:
-                name_tag = item.find('strong')
-                if name_tag:
-                    name = name_tag.text.strip()
-                    # Timings extract logic
-                    times = [t.text.strip().split('\n')[0] for t in item.find_all('div', class_='__details') if ":" in t.text]
-                    
-                    if name and times:
-                        movie_list.append({"name": name, "times": times})
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
+        listings = soup.find_all('li', class_='list')
         
-        # If scraper returns empty (blocked), we use fallback to ensure bot sends a message
-        if not movie_list:
-             return [
-                {"name": "Vidaamuyarchi", "times": ["10:30 AM", "02:15 PM", "06:30 PM", "10:15 PM"]},
-                {"name": "Good Bad Ugly", "times": ["11:00 AM", "02:30 PM", "07:00 PM", "10:30 PM"]}
-            ]
-            
+        for item in listings:
+            name_tag = item.find('strong')
+            if name_tag:
+                name = name_tag.text.strip()
+                times = [t.text.strip().split('\n')[0] for t in item.find_all('div', class_='__details') if ":" in t.text]
+                if name and times:
+                    movie_list.append({"name": name, "times": times})
+        
         return movie_list
-
     except Exception as e:
-        print(f"Scraper Error: {e}")
+        print(f"Selenium Error: {e}")
         return []
+    finally:
+        if driver:
+            driver.quit()
 
-def send_telegram_update():
-    movies = get_la_maris_shows()
+def send_to_telegram():
+    movies = get_bms_live_data()
     ist_now = datetime.utcnow() + timedelta(hours=5, minutes=30)
-    display_time = ist_now.strftime("%d-%m-%Y | %I:%M %p")
-    
-    # Message Construction
-    msg = f"🎬 *LA CINEMAS (MARIS) - TRICHY* 🎬\n"
-    msg += f"🕒 Updated: {display_time}\n"
-    msg += "━━━━━━━━━━━━━━━━━━━━\n"
+    now_str = ist_now.strftime("%d-%m-%Y | %I:%M %p")
     
     if not movies:
-        msg += "⚠️ *Status:* Live fetch currently unavailable.\n"
-        msg += "Please check the website below for exact shows.\n"
-    else:
-        for m in movies:
-            msg += f"🎥 *{m['name']}*\n"
-            msg += f"🕒 {', '.join(m['times'])}\n\n"
+        # No message sent if no movies found (to avoid spamming error)
+        return
+
+    msg = f"🎬 *LA CINEMAS (MARIS) - LIVE SHOWS* 🎬\n"
+    msg += f"🕒 Updated: {now_str}\n"
+    msg += "━━━━━━━━━━━━━━━━━━━━\n"
+    
+    for m in movies:
+        msg += f"🎥 *{m['name']}*\n"
+        msg += f"🕒 {', '.join(m['times'])}\n\n"
             
     msg += "━━━━━━━━━━━━━━━━━━━━\n"
-    msg += "🎟️ [Live Timings & Booking](https://in.bookmyshow.com/buytickets/la-cinemas-maris-trichy/cinema-trich-LATG-MT/)"
+    msg += "🎟️ [Live Booking Link]({url})"
 
-    # Telegram API Call
-    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-    payload = {
-        "chat_id": CHAT_ID,
-        "text": msg,
-        "parse_mode": "Markdown",
-        "disable_web_page_preview": True
-    }
-    
-    try:
-        requests.get(url, params=payload)
-        print(f"Success: Message sent at {display_time}")
-    except Exception as e:
-        print(f"Telegram Error: {e}")
+    requests.get(f"https://api.telegram.org/bot{TOKEN}/sendMessage", params={"chat_id": CHAT_ID, "text": msg, "parse_mode": "Markdown", "disable_web_page_preview": True})
 
 if __name__ == "__main__":
-    send_telegram_update()
+    send_to_telegram()
