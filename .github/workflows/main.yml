@@ -1,7 +1,6 @@
-name: 5-Minute Steel and Movie Bot
+name: 5-Minute Live Movie Bot
 on:
   schedule:
-    # Intha line ovvoru 5 nimishathukkum automatic-ah trigger pannum
     - cron: '*/5 * * * *'
   repository_dispatch:
     types: [trigger_bot, trigger_movie]
@@ -20,13 +19,11 @@ jobs:
           python-version: '3.9'
 
       - name: Install Dependencies
-        run: pip install requests beautifulsoup4
+        run: |
+          pip install requests beautifulsoup4 selenium webdriver-manager
 
-      # --- RUN BOTH BOTS EVERY 5 MINS ---
-      # Schedule moolama varum pothu rendu python files-um run aagum
-      
       - name: Run Steel Bot
         run: python bot.py
 
-      - name: Run Movie Bot
+      - name: Run Movie Bot (Live Selenium)
         run: python movies.py
