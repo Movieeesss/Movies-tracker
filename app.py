@@ -1,23 +1,19 @@
 from flask import Flask
-import os
-import importlib
-import movies 
+import movies
 
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Trichy Tracker Active!"
+    return "✅ Trichy Movie Bot Running!"
 
-@app.route('/run-movies')
-def run_movies():
+@app.route('/run')
+def run():
     try:
-        importlib.reload(movies)
-        movies.run_all() # Matches the function name in movies.py
-        return "Movie Bot Success!"
+        movies.run_all()
+        return "✅ Movie bot executed"
     except Exception as e:
-        return f"Error: {str(e)}"
+        return f"❌ Error: {str(e)}"
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run()
