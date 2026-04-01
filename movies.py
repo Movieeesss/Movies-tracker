@@ -8,21 +8,20 @@ CHAT_ID = "1115358053"
 API_KEY = "1c52b530-7d6e-4a64-b061-85cc76e6e937"
 
 def get_movie_timings():
-    # April 2nd URL - Iniki date exact-aa target panrom
+    # April 2nd exact target
     target_url = "https://in.bookmyshow.com/buytickets/la-cinemas-maris-trichy/cinema-trich-LATG-MT/20260402"
     
-    # wait_for=.showtime-pill + render=true + residential proxy
-    # Intha combo thaan BMS-oda security-ah udaikkum
-    proxy_url = f"https://api.webscraping.ai/html?api_key={API_KEY}&url={target_url}&proxy=residential&render=true&wait_for=.showtime-pill"
+    # 1. wait_for=.showtime-pill is CRITICAL (Wait until times appear)
+    # 2. wait=15000 is for extra safety (15 seconds)
+    proxy_url = f"https://api.webscraping.ai/html?api_key={API_KEY}&url={target_url}&proxy=residential&render=true&wait_for=.showtime-pill&wait=15000"
     
     movie_results = []
     try:
-        # Increase timeout to 180s for heavy page loading
         response = requests.get(proxy_url, timeout=180)
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
             
-            # BMS layout check: movie listings usually in 'li' with class 'list'
+            # BMS lists each movie in 'li.list'
             containers = soup.select('li.list')
             
             for container in containers:
@@ -42,7 +41,7 @@ def get_movie_timings():
                     movie_results.append({"name": name, "times": list(dict.fromkeys(times))})
 
     except Exception as e:
-        print(f"Scrape Error: {e}")
+        print(f"Bypass Error: {e}")
     return movie_results
 
 def run_all():
@@ -54,7 +53,7 @@ def run_all():
     
     if not movies:
         msg += "📊 *Status:* Theater syncing live timings...\n"
-        msg += "💡 _BMS security is high today. Please try again later._\n"
+        msg += "💡 _BMS security is high. Waiting for next cycle._\n"
     else:
         for m in movies:
             msg += f"🎥 *{m['name'].upper()}*\n🕒 {', '.join(m['times'])}\n\n"
