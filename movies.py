@@ -1,6 +1,6 @@
 import asyncio
 import requests
-import subprocess # Intha line mukkiyam
+import os
 from playwright.async_api import async_playwright
 from playwright_stealth import stealth 
 from datetime import datetime, timedelta
@@ -9,9 +9,8 @@ TOKEN = "8745585993:AAE2zRpimM9_VW9YK0I7FhDmvHb7iy1tw9A"
 CHAT_ID = "1115358053"
 
 async def get_bms_data():
-    # Render-la executable missing error-ah fix panna ithu help pannum
-    print("Installing Chromium browser...")
-    subprocess.run(["python", "-m", "playwright", "install", "chromium"])
+    # Render-la browser missing error-ah permanent-ah fix panna
+    os.system("playwright install chromium")
 
     movie_results = []
     async with async_playwright() as p:
@@ -26,14 +25,11 @@ async def get_bms_data():
         url = "https://in.bookmyshow.com/buytickets/la-cinemas-maris-trichy/cinema-trich-LATG-MT/20260402"
         
         try:
-            # First message to confirm bot is working
-            requests.get(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
-                         params={"chat_id": CHAT_ID, "text": "⏳ Scraper started... Fetching LA Cinemas timings.", "parse_mode": "Markdown"})
-
+            print("Fetching BMS data...")
             await page.goto(url, wait_until="networkidle", timeout=90000)
-            await asyncio.sleep(15) # Wait for Render speed
+            await asyncio.sleep(20) # Render-ku 20s wait thaan safe
             await page.mouse.wheel(0, 600)
-            await asyncio.sleep(3)
+            await asyncio.sleep(5)
 
             movie_elements = await page.query_selector_all('li.list')
             for movie in movie_elements:
@@ -46,13 +42,15 @@ async def get_bms_data():
 
         except Exception as e:
             print(f"SCRAPING ERROR: {e}")
-            requests.get(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
-                         params={"chat_id": CHAT_ID, "text": f"❌ Scraper Error: {e}"})
         
         await browser.close()
     return movie_results
 
 def run_all():
+    # Bot start testing
+    requests.get(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
+                 params={"chat_id": CHAT_ID, "text": "⏳ Scraper started... fetching data from BMS.", "parse_mode": "Markdown"})
+    
     try:
         loop = asyncio.get_event_loop()
     except RuntimeError:
@@ -69,6 +67,7 @@ def run_all():
     
     if not movies:
         body = "📊 *Status:* Theater syncing live timings...\n"
+        body += "💡 _BMS security high or shows not opened yet._\n"
     else:
         body = ""
         for m in movies:
