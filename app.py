@@ -1,31 +1,30 @@
 from flask import Flask
 import threading
-import movies # Movie scraper file
+import os
 
-# 'bot.py' file illai na error varaama irukka intha logic
+# --- IMPORTING MOVIE SCRAPER ONLY ---
 try:
-    import bot # Steel scraper
+    import movies # movies.py file-ah mattum import panrom
 except ImportError:
-    bot = None
+    movies = None
 
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Uniq Designs Bot Server is Live!"
+    return "🎬 Uniq Designs - Movie Bot Server is Live!"
 
-@app.route('/run-steel')
-def trigger_steel():
-    if bot:
-        threading.Thread(target=bot.send_update).start()
-        return "Steel Update Triggered!"
-    else:
-        return "Error: bot.py file not found in server!"
-
+# --- ENDPOINT FOR MOVIE TIMINGS ---
 @app.route('/run-movies')
 def trigger_movies():
-    threading.Thread(target=movies.run_all).start()
-    return "Movie Update Triggered!"
+    if movies:
+        # Threading use panrom Render timeout thavirkka
+        threading.Thread(target=movies.run_all).start()
+        return "🎬 Movie Update Triggered! Check Telegram."
+    else:
+        return "❌ Error: movies.py file not found in repository!"
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5000)
+    # Render requirements-ku yetha maadhiri port set panrom
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
