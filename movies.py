@@ -1,5 +1,5 @@
 import requests
-import json
+import re
 from datetime import datetime, timedelta
 
 # --- CONFIG ---
@@ -8,34 +8,39 @@ CHAT_ID = "1115358053"
 SCRAPER_API_KEY = "9919328312a5982c5b8bca398de8a5ef"
 
 def get_movie_data():
-    # Direct BMS Theater API target (LA Cinemas Trichy code: LATG)
-    # Intha URL direct-aa JSON data-va thara try pannum
-    target_url = "https://in.bookmyshow.com/serv/getData?cmd=GETSHOWTIMESBYEVENT&f=json&dc=TRICH&vc=LATG&et=MT"
+    # Targeted BMS Search API for LA Cinemas Maris (LATG)
+    target_url = "https://in.bookmyshow.com/serv/getData?cmd=GETSHOWTIMESBYEVENT&f=json&dc=TRICH&vc=LATG"
     
-    proxy_url = f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={target_url}&country_code=in&render=true"
+    # Using ScraperAPI with India Proxy
+    proxy_url = f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={target_url}&country_code=in"
     
-    movie_list = []
+    movie_results = []
     try:
         response = requests.get(proxy_url, timeout=60)
-        # Check if response is JSON
+        
+        # Method 1: Try parsing as JSON (Direct API)
         try:
             data = response.json()
-            # Inga BMS JSON structure-ah parse pannanum
-            # Note: BMS API often changes, so we add a text-search backup
+            if 'BookMyShow' in data and 'arrEvents' in data['BookMyShow']:
+                events = data['BookMyShow']['arrEvents']
+                for event in events:
+                    name = event.get('EventName', 'Movie')
+                    # Find timings in the child objects
+                    times = [] # Add logic to extract times from child arrays if present
+                    if name:
+                        movie_results.append({"name": name, "times": ["Check BMS for times"]})
         except:
-            # Fallback to direct page text search if JSON fails
-            from bs4 import BeautifulSoup
-            soup = BeautifulSoup(response.text, 'html.parser')
-            # Look for all instances of "AM" and "PM" and their surrounding text
-            import re
-            text = soup.get_text()
-            matches = re.findall(r'([A-Za-z0-9\s]+)\s+(\d{1,2}:\d{2}\s?(?:AM|PM))', text)
-            for m in matches:
-                movie_list.append({"name": m[0].strip(), "times": [m[1]]})
+            # Method 2: If JSON fails, deep search text for time patterns
+            text = response.text
+            # Finds patterns like 10:30 AM, 02:15 PM
+            raw_times = re.findall(r'\d{1,2}:\d{2}\s?(?:AM|PM|am|pm)', text)
+            if raw_times:
+                movie_results.append({"name": "Current Shows", "times": list(dict.fromkeys(raw_times))})
+
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"API Error: {e}")
     
-    return movie_list
+    return movie_results
 
 def run_all():
     movies = get_movie_data()
@@ -45,14 +50,13 @@ def run_all():
     msg = f"🎬 *LA CINEMAS (MARIS) - LIVE* 🎬\n🕒 Updated: {time_str}\n━━━━━━━━━━━━━━━━━━━━\n"
     
     if not movies:
-        msg += "📊 *Status:* Scraper Blocked / Data Hidden\n"
-        msg += "⚠️ _BMS security is blocking the request._\n"
+        msg += "⚠️ *Status:* BMS Security Blocked / No Data Found.\n"
+        msg += "💡 _Possible reason: ScraperAPI Credits exhausted or IP block._\n"
     else:
-        # Grouping times by movie name
         for m in movies:
             msg += f"🎥 *{m['name']}*\n🕒 {', '.join(m['times'])}\n\n"
             
-    msg += "━━━━━━━━━━━━━━━━━━━━\n🎟️ [Check BMS](https://in.bookmyshow.com/buytickets/la-cinemas-maris-trichy/cinema-trich-LATG-MT/)"
+    msg += "━━━━━━━━━━━━━━━━━━━━\n🎟️ [Book on BMS](https://in.bookmyshow.com/buytickets/la-cinemas-maris-trichy/cinema-trich-LATG-MT/)"
     
     requests.get(f"https://api.telegram.org/bot{TOKEN}/sendMessage", params={"chat_id": CHAT_ID, "text": msg, "parse_mode": "Markdown"})
 
