@@ -1,5 +1,6 @@
 import asyncio
 import requests
+import subprocess # Intha line mukkiyam
 from playwright.async_api import async_playwright
 from playwright_stealth import stealth 
 from datetime import datetime, timedelta
@@ -8,9 +9,9 @@ TOKEN = "8745585993:AAE2zRpimM9_VW9YK0I7FhDmvHb7iy1tw9A"
 CHAT_ID = "1115358053"
 
 async def get_bms_data():
-    # TEST MESSAGE: Scraper start aana udane ithu varanum
-    requests.get(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
-                 params={"chat_id": CHAT_ID, "text": "⏳ Scraper started... fetching data from BMS.", "parse_mode": "Markdown"})
+    # Render-la executable missing error-ah fix panna ithu help pannum
+    print("Installing Chromium browser...")
+    subprocess.run(["python", "-m", "playwright", "install", "chromium"])
 
     movie_results = []
     async with async_playwright() as p:
@@ -25,26 +26,21 @@ async def get_bms_data():
         url = "https://in.bookmyshow.com/buytickets/la-cinemas-maris-trichy/cinema-trich-LATG-MT/20260402"
         
         try:
-            print(f"Opening: {url}")
+            # First message to confirm bot is working
+            requests.get(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
+                         params={"chat_id": CHAT_ID, "text": "⏳ Scraper started... Fetching LA Cinemas timings.", "parse_mode": "Markdown"})
+
             await page.goto(url, wait_until="networkidle", timeout=90000)
-            
-            # INCREASED WAIT: 15 seconds for slow Render server
-            print("Waiting 15 seconds for showtimes...")
-            await asyncio.sleep(15)
-            
+            await asyncio.sleep(15) # Wait for Render speed
             await page.mouse.wheel(0, 600)
             await asyncio.sleep(3)
 
             movie_elements = await page.query_selector_all('li.list')
-            print(f"Found {len(movie_elements)} movies.")
-            
             for movie in movie_elements:
                 title_elem = await movie.query_selector('strong')
                 name = await title_elem.inner_text() if title_elem else ""
-                
                 time_elems = await movie.query_selector_all('a[data-session-id], .showtime-pill')
                 times = [await t.inner_text() for t in time_elems if ":" in await t.inner_text()]
-                
                 if name and times:
                     movie_results.append({"name": name.strip().upper(), "times": list(dict.fromkeys(times))})
 
@@ -73,7 +69,6 @@ def run_all():
     
     if not movies:
         body = "📊 *Status:* Theater syncing live timings...\n"
-        body += "💡 _BMS might be blocking or page didn't load in time._\n"
     else:
         body = ""
         for m in movies:
