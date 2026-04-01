@@ -1,71 +1,57 @@
 import asyncio
 import requests
 from playwright.async_api import async_playwright
-# Changed this line:
 from playwright_stealth import stealth 
 from datetime import datetime, timedelta
 
-# Bot Settings
 TOKEN = "8745585993:AAE2zRpimM9_VW9YK0I7FhDmvHb7iy1tw9A"
 CHAT_ID = "1115358053"
 
 async def get_bms_data():
+    # TEST MESSAGE: Scraper start aana udane ithu varanum
+    requests.get(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
+                 params={"chat_id": CHAT_ID, "text": "⏳ Scraper started... fetching data from BMS.", "parse_mode": "Markdown"})
+
     movie_results = []
     async with async_playwright() as p:
         browser = await p.chromium.launch(
             headless=True, 
-            args=[
-                "--no-sandbox", 
-                "--disable-setuid-sandbox", 
-                "--disable-blink-features=AutomationControlled",
-                "--disable-gpu",
-                "--disable-dev-shm-usage"
-            ]
+            args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
         )
-        
-        context = await browser.new_context(
-            viewport={'width': 800, 'height': 600},
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-        )
+        context = await browser.new_context(viewport={'width': 800, 'height': 600})
         page = await context.new_page()
-        
-        # Changed this line:
         await stealth(page)
 
         url = "https://in.bookmyshow.com/buytickets/la-cinemas-maris-trichy/cinema-trich-LATG-MT/20260402"
         
         try:
-            print(f"--- Scraping Started for: {url} ---")
-            await page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            print(f"Opening: {url}")
+            await page.goto(url, wait_until="networkidle", timeout=90000)
             
-            print("Waiting 7 seconds for showtimes to load...")
-            await asyncio.sleep(7)
+            # INCREASED WAIT: 15 seconds for slow Render server
+            print("Waiting 15 seconds for showtimes...")
+            await asyncio.sleep(15)
             
-            await page.mouse.wheel(0, 500)
-            await asyncio.sleep(2)
+            await page.mouse.wheel(0, 600)
+            await asyncio.sleep(3)
 
             movie_elements = await page.query_selector_all('li.list')
-            print(f"Found {len(movie_elements)} potential movie containers.")
+            print(f"Found {len(movie_elements)} movies.")
             
             for movie in movie_elements:
                 title_elem = await movie.query_selector('strong')
                 name = await title_elem.inner_text() if title_elem else ""
                 
-                time_elems = await movie.query_selector_all('a[data-session-id], .showtime-pill, .__showtime')
-                times = []
-                for t in time_elems:
-                    t_text = await t.inner_text()
-                    if ":" in t_text:
-                        times.append(t_text.strip())
+                time_elems = await movie.query_selector_all('a[data-session-id], .showtime-pill')
+                times = [await t.inner_text() for t in time_elems if ":" in await t.inner_text()]
                 
                 if name and times:
-                    movie_results.append({
-                        "name": name.strip().upper(), 
-                        "times": list(dict.fromkeys(times))
-                    })
+                    movie_results.append({"name": name.strip().upper(), "times": list(dict.fromkeys(times))})
 
         except Exception as e:
             print(f"SCRAPING ERROR: {e}")
+            requests.get(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
+                         params={"chat_id": CHAT_ID, "text": f"❌ Scraper Error: {e}"})
         
         await browser.close()
     return movie_results
@@ -77,7 +63,6 @@ def run_all():
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         
-    print("Executing get_bms_data...")
     movies = loop.run_until_complete(get_bms_data())
     
     ist_now = datetime.utcnow() + timedelta(hours=5, minutes=30)
@@ -88,7 +73,7 @@ def run_all():
     
     if not movies:
         body = "📊 *Status:* Theater syncing live timings...\n"
-        body += "💡 _BMS security high or shows not opened yet._\n"
+        body += "💡 _BMS might be blocking or page didn't load in time._\n"
     else:
         body = ""
         for m in movies:
@@ -96,18 +81,8 @@ def run_all():
             
     footer = "━━━━━━━━━━━━━━━━━━━━\n🎟️ [Book on BMS](https://in.bookmyshow.com/buytickets/la-cinemas-maris-trichy/cinema-trich-LATG-MT/20260402)"
     
-    full_message = header + meta + body + footer
-
-    print(f"Attempting to send message to Telegram Chat: {CHAT_ID}")
-    try:
-        response = requests.get(
-            f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
-            params={"chat_id": CHAT_ID, "text": full_message, "parse_mode": "Markdown"},
-            timeout=30
-        )
-        print(f"Telegram API Status Code: {response.status_code}")
-    except Exception as e:
-        print(f"TELEGRAM SEND ERROR: {e}")
+    requests.get(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
+                 params={"chat_id": CHAT_ID, "text": header + meta + body + footer, "parse_mode": "Markdown"})
 
 if __name__ == "__main__":
     run_all()
