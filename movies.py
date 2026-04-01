@@ -1,7 +1,8 @@
 import asyncio
 import requests
 from playwright.async_api import async_playwright
-from playwright_stealth import stealth_async
+# Changed this line:
+from playwright_stealth import stealth 
 from datetime import datetime, timedelta
 
 # Bot Settings
@@ -11,7 +12,6 @@ CHAT_ID = "1115358053"
 async def get_bms_data():
     movie_results = []
     async with async_playwright() as p:
-        # Render Free Tier optimized launch arguments
         browser = await p.chromium.launch(
             headless=True, 
             args=[
@@ -28,24 +28,22 @@ async def get_bms_data():
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
         )
         page = await context.new_page()
-        await stealth_async(page)
+        
+        # Changed this line:
+        await stealth(page)
 
-        # Target URL: LA Cinemas Maris Trichy (April 2nd)
         url = "https://in.bookmyshow.com/buytickets/la-cinemas-maris-trichy/cinema-trich-LATG-MT/20260402"
         
         try:
             print(f"--- Scraping Started for: {url} ---")
             await page.goto(url, wait_until="domcontentloaded", timeout=60000)
             
-            # Wait for content to render
             print("Waiting 7 seconds for showtimes to load...")
             await asyncio.sleep(7)
             
-            # Simple Scroll to trigger JS
             await page.mouse.wheel(0, 500)
             await asyncio.sleep(2)
 
-            # Extract Movie Elements
             movie_elements = await page.query_selector_all('li.list')
             print(f"Found {len(movie_elements)} potential movie containers.")
             
@@ -73,7 +71,6 @@ async def get_bms_data():
     return movie_results
 
 def run_all():
-    # Setup Async Loop for Render
     try:
         loop = asyncio.get_event_loop()
     except RuntimeError:
@@ -83,7 +80,6 @@ def run_all():
     print("Executing get_bms_data...")
     movies = loop.run_until_complete(get_bms_data())
     
-    # Time Formatting
     ist_now = datetime.utcnow() + timedelta(hours=5, minutes=30)
     time_str = ist_now.strftime("%d-%m-%Y | %I:%M %p")
     
@@ -102,7 +98,6 @@ def run_all():
     
     full_message = header + meta + body + footer
 
-    # --- TELEGRAM SEND WITH LOGGING ---
     print(f"Attempting to send message to Telegram Chat: {CHAT_ID}")
     try:
         response = requests.get(
@@ -111,8 +106,6 @@ def run_all():
             timeout=30
         )
         print(f"Telegram API Status Code: {response.status_code}")
-        if response.status_code != 200:
-            print(f"Telegram Error Response: {response.text}")
     except Exception as e:
         print(f"TELEGRAM SEND ERROR: {e}")
 
