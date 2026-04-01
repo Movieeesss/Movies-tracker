@@ -1,5 +1,6 @@
 import requests
 from bs4 import BeautifulSoup
+import json
 import re
 from datetime import datetime, timedelta
 
@@ -8,58 +9,80 @@ CHAT_ID = "1115358053"
 API_KEY = "1c52b530-7d6e-4a64-b061-85cc76e6e937"
 
 def get_movie_timings():
-    # April 2nd exact target
+    # April 2nd target
     target_url = "https://in.bookmyshow.com/buytickets/la-cinemas-maris-trichy/cinema-trich-LATG-MT/20260402"
     
-    # 1. wait_for=.showtime-pill is CRITICAL (Wait until times appear)
-    # 2. wait=15000 is for extra safety (15 seconds)
-    proxy_url = f"https://api.webscraping.ai/html?api_key={API_KEY}&url={target_url}&proxy=residential&render=true&wait_for=.showtime-pill&wait=15000"
+    # Increase timeout and wait for the main list container
+    proxy_url = f"https://api.webscraping.ai/html?api_key={API_KEY}&url={target_url}&proxy=residential&render=true&wait_for=#venuelist&wait=20000"
     
     movie_results = []
     try:
-        response = requests.get(proxy_url, timeout=180)
+        response = requests.get(proxy_url, timeout=210)
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
             
-            # BMS lists each movie in 'li.list'
-            containers = soup.select('li.list')
+            # METHOD 1: Look for individual movie entries (Latest BMS Classes)
+            # BMS ippo 'listing-info' or 'list' use panraanga
+            items = soup.select('li.list, .listing-info, .venue-listing-item')
             
-            for container in containers:
-                # Name extraction
-                name_tag = container.find(attrs={"data-event-title": True})
-                name = name_tag['data-event-title'] if name_tag else ""
+            for item in items:
+                # Movie Name - usually inside strong or data attributes
+                name_tag = item.find('strong') or item.select_one('.movie-name')
+                name = name_tag.get_text(strip=True) if name_tag else ""
                 
-                if not name:
-                    name_tag = container.select_one('.movie-name, .name, strong')
-                    name = name_tag.get_text(strip=True) if name_tag else ""
+                # Showtimes - looking for pills/session times
+                time_tags = item.find_all('div', {'class': re.compile(r'showtime|pill|session', re.I)})
+                # If div not found, try 'a' tags
+                if not time_tags:
+                    time_tags = item.find_all('a', {'data-session-id': True})
+                
+                times = []
+                for t in time_tags:
+                    t_text = t.get_text(strip=True)
+                    # Cleaning time format (e.g., 10:30 AM)
+                    time_match = re.search(r'\d{1,2}:\d{2}\s*(?:AM|PM)?', t_text, re.I)
+                    if time_match:
+                        times.append(time_match.group())
 
-                # Timing extraction
-                time_tags = container.find_all('a', class_=re.compile(r'showtime|pill|session', re.I))
-                times = [t.get_text(strip=True) for t in time_tags if ":" in t.get_text()]
-                
                 if name and times:
                     movie_results.append({"name": name, "times": list(dict.fromkeys(times))})
 
+            # METHOD 2: Backup - Scrape from Script tag (Structured Data)
+            if not movie_results:
+                script_tag = soup.find('script', type='application/ld+json')
+                if script_tag:
+                    data = json.loads(script_tag.string)
+                    # Structured data analysis logic inge varum (if needed)
+
     except Exception as e:
-        print(f"Bypass Error: {e}")
+        print(f"Scraping Error: {e}")
+    
     return movie_results
 
 def run_all():
-    movies = get_movie_timings()
+    movies_list = get_movie_timings()
+    # Correcting IST Time
     ist_now = datetime.utcnow() + timedelta(hours=5, minutes=30)
     time_str = ist_now.strftime("%d-%m-%Y | %I:%M %p")
     
-    msg = f"🎬 *LA CINEMAS (MARIS) - LIVE UPDATES* 🎬\n📅 *DATE:* 02-04-2026\n🕒 {time_str}\n━━━━━━━━━━━━━━━━━━━━\n"
+    header = "🎬 *LA CINEMAS (MARIS) - LIVE UPDATES* 🎬\n"
+    meta = f"📅 *DATE:* 02-04-2026\n🕒 {time_str}\n━━━━━━━━━━━━━━━━━━━━\n"
     
-    if not movies:
-        msg += "📊 *Status:* Theater syncing live timings...\n"
-        msg += "💡 _BMS security is high. Waiting for next cycle._\n"
+    if not movies_list:
+        body = "📊 *Status:* Theater syncing live timings...\n"
+        body += "💡 _BMS security is high. Retrying in next cycle._\n"
     else:
-        for m in movies:
-            msg += f"🎥 *{m['name'].upper()}*\n🕒 {', '.join(m['times'])}\n\n"
+        body = ""
+        for m in movies_list:
+            body += f"🎥 *{m['name'].upper()}*\n🕒 {', '.join(m['times'])}\n\n"
             
-    msg += "━━━━━━━━━━━━━━━━━━━━\n🎟️ [Book on BMS](https://in.bookmyshow.com/buytickets/la-cinemas-maris-trichy/cinema-trich-LATG-MT/20260402)"
-    requests.get(f"https://api.telegram.org/bot{TOKEN}/sendMessage", params={"chat_id": CHAT_ID, "text": msg, "parse_mode": "Markdown"})
+    footer = "━━━━━━━━━━━━━━━━━━━━\n🎟️ [Book on BMS](https://in.bookmyshow.com/buytickets/la-cinemas-maris-trichy/cinema-trich-LATG-MT/20260402)"
+    
+    full_msg = header + meta + body + footer
+    
+    # Telegram Send
+    requests.get(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
+                 params={"chat_id": CHAT_ID, "text": full_msg, "parse_mode": "Markdown"})
 
 if __name__ == "__main__":
     run_all()
