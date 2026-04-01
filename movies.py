@@ -2,58 +2,36 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 
+# --- CONFIG ---
 TOKEN = "8745585993:AAE2zRpimM9_VW9YK0I7FhDmvHb7iy1tw9A"
 CHAT_ID = "1115358053"
+SCRAPER_API_KEY = "9919328312a5982c5b8bca398de8a5ef" # Unga key-ah add pannitten
 
 def run_all():
     ist_now = datetime.utcnow() + timedelta(hours=5, minutes=30)
-    date_str = ist_now.strftime("%Y%m%d")
+    target_url = f"https://in.bookmyshow.com/buytickets/la-cinemas-maris-trichy/cinema-trich-LATG-MT/{ist_now.strftime('%Y%m%d')}"
     
-    # BMS Direct URL
-    url = f"https://in.bookmyshow.com/buytickets/la-cinemas-maris-trichy/cinema-trich-LATG-MT/{date_str}"
-    
-    # Indha headers thaan romba mukkiyam - Idhu real mobile user maadhiri nadakkum
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-        'Referer': 'https://in.bookmyshow.com/',
-        'Accept-Language': 'en-US,en;q=0.9'
-    }
+    # ScraperAPI Logic - Idhu unga request-ah real Indian user maadhiri mathum
+    proxy_url = f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={target_url}&render=true&country_code=in"
     
     movie_list = []
-    
     try:
-        response = requests.get(url, headers=headers, timeout=20)
+        # Rendering enabled so JavaScript movies load aagum
+        response = requests.get(proxy_url, timeout=60)
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # BMS-la movie blocks-ah ippo find panrom
+        # BMS listings target
         listings = soup.find_all('li', class_='list')
-        
-        if not listings:
-            # Plan B: Try a different tag structure if first one fails
-            listings = soup.select('.cinema-showtimes')
-
         for item in listings:
-            # Movie Name extraction
-            name_tag = item.find('strong') or item.find('a', class_='__movie-name')
+            name_tag = item.find('strong')
             if name_tag:
                 name = name_tag.get_text(strip=True)
-                
-                # Show timings extraction
-                times_list = []
-                # Finding timings in the button/link structure
-                time_tags = item.find_all('a', attrs={'data-showtime-code': True}) or item.find_all('div', class_='__details')
-                
-                for t in time_tags:
-                    t_text = t.get_text(strip=True).split('\n')[0]
-                    if ":" in t_text: # Sharp-ah time format-ah mattum edukkum
-                        times_list.append(t_text)
-                
-                if name and times_list:
-                    movie_list.append({"name": name, "times": list(dict.fromkeys(times_list))}) # Remove duplicates
-
+                # Show timings check
+                times = [t.get_text(strip=True) for t in item.find_all('div', class_='__details') if ":" in t.text]
+                if name and times:
+                    movie_list.append({"name": name, "times": times})
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Proxy Error: {e}")
 
     # Message Formatting
     time_str = ist_now.strftime("%d-%m-%Y | %I:%M %p")
@@ -62,15 +40,15 @@ def run_all():
     msg += "━━━━━━━━━━━━━━━━━━━━\n"
     
     if not movie_list:
-        msg += "⚠️ *BMS Data Locked.*\nServer is currently protecting showtimes.\n"
-        msg += "Try checking via the link below.\n"
+        msg += "⚠️ *BMS Security Alert.*\nProxy route-layum data kidaikala.\n"
+        msg += "Try checking the link below manually.\n"
     else:
         for m in movie_list:
             msg += f"🎥 *{m['name']}*\n"
             msg += f"🕒 {', '.join(m['times'])}\n\n"
             
     msg += "━━━━━━━━━━━━━━━━━━━━\n"
-    msg += f"🎟️ [Direct Booking Link]({url})"
+    msg += f"🎟️ [Direct Booking Link]({target_url})"
 
     # Send to Telegram
     requests.get(f"https://api.telegram.org/bot{TOKEN}/sendMessage", params={
