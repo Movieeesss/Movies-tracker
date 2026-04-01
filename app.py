@@ -18,13 +18,16 @@ def home():
 @app.route('/run-movies')
 def trigger_movies():
     if movies:
-        # Threading use panrom Render timeout thavirkka
+        # 1. Threading starts the scraper in the background
         threading.Thread(target=movies.run_all).start()
-        return "🎬 Movie Update Triggered! Check Telegram."
+        
+        # 2. Immediate tiny response to Cron-job (Fixes "Output too large")
+        return "OK", 200
     else:
-        return "❌ Error: movies.py file not found in repository!"
+        # Error response if file is missing
+        return "ERROR: movies.py missing", 404
 
 if __name__ == "__main__":
-    # Render requirements-ku yetha maadhiri port set panrom
+    # Render dynamic port binding
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
