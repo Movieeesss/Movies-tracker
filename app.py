@@ -1,6 +1,8 @@
 from flask import Flask
 import os
 import importlib
+import movies # Direct import
+import bot    # Direct import
 
 app = Flask(__name__)
 
@@ -11,10 +13,9 @@ def home():
 @app.route('/run-steel')
 def run_steel():
     try:
-        # bot.py-ah direct-ah import panni run panrom
-        import bot
         importlib.reload(bot)
-        bot.send_update()
+        # Indha line-ah unga bot.py-la irukka function name-ku mathunom
+        bot.send_update() 
         return "Steel Bot Executed Successfully!"
     except Exception as e:
         return f"Steel Bot Error: {str(e)}"
@@ -22,10 +23,9 @@ def run_steel():
 @app.route('/run-movies')
 def run_movies():
     try:
-        # movies.py-ah direct-ah import panni run panrom
-        import movies
         importlib.reload(movies)
-        movies.send_telegram() # Unga movies.py-la intha function name check pannikonga
+        # UNGA MOVIES.PY-LA IRUKKA REAL FUNCTION NAME:
+        movies.send_update() 
         return "Movie Bot Executed Successfully!"
     except Exception as e:
         return f"Movie Bot Error: {str(e)}"
