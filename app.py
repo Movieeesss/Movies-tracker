@@ -1,26 +1,35 @@
 from flask import Flask
 import os
-import subprocess
+import importlib
 
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Trichy Tracker is Running on Render!"
+    return "Trichy Tracker is Active!"
 
-# Steel bot trigger
 @app.route('/run-steel')
 def run_steel():
-    subprocess.Popen(['python', 'bot.py'])
-    return "Steel Bot Started!"
+    try:
+        # bot.py-ah direct-ah import panni run panrom
+        import bot
+        importlib.reload(bot)
+        bot.send_update()
+        return "Steel Bot Executed Successfully!"
+    except Exception as e:
+        return f"Steel Bot Error: {str(e)}"
 
-# Movie bot trigger
 @app.route('/run-movies')
 def run_movies():
-    subprocess.Popen(['python', 'movies.py'])
-    return "Movie Bot Started!"
+    try:
+        # movies.py-ah direct-ah import panni run panrom
+        import movies
+        importlib.reload(movies)
+        movies.send_telegram() # Unga movies.py-la intha function name check pannikonga
+        return "Movie Bot Executed Successfully!"
+    except Exception as e:
+        return f"Movie Bot Error: {str(e)}"
 
 if __name__ == "__main__":
-    # Render automatic-ah port assign pannum, adhai Flask eduthukkum
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
