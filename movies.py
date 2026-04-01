@@ -9,39 +9,30 @@ API_KEY = "1c52b530-7d6e-4a64-b061-85cc76e6e937"
 
 def get_movie_timings():
     target_url = "https://in.bookmyshow.com/buytickets/la-cinemas-maris-trichy/cinema-trich-LATG-MT/"
-    # residential proxy + full page render
-    proxy_url = f"https://api.webscraping.ai/html?api_key={API_KEY}&url={target_url}&proxy=residential&render=true"
+    
+    # POWERFUL CHANGE: wait=5000 adds a 5-second delay for JavaScript to fully load timings
+    proxy_url = f"https://api.webscraping.ai/html?api_key={API_KEY}&url={target_url}&proxy=residential&render=true&wait=5000"
     
     movie_results = []
     try:
-        response = requests.get(proxy_url, timeout=90)
+        response = requests.get(proxy_url, timeout=120) # High timeout for slow residential proxy
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
             
-            # Technique: Search for ALL text blocks that contain show timings
-            # Most BMS layouts use 'showtime-pill' or 'session-time'
-            all_html = str(soup)
-            
-            # Find movie names and their following timings
-            # BMS layout check:
-            containers = soup.find_all(['li', 'div'], class_=re.compile(r'list|card|listing', re.I))
+            # BMS targets: listing-info or movie-card
+            containers = soup.select('.listing-info, .movie-card, li.list')
             
             for container in containers:
-                name_tag = container.find(['strong', 'h5', 'span'], class_=re.compile(r'name|title', re.I))
+                # Name extraction
+                name_tag = container.find(['strong', 'h5']) or container.select_one('.movie-name, .name')
                 name = name_tag.get_text(strip=True) if name_tag else ""
                 
-                # Regex for timings: 10:30 AM, 2:15 PM etc.
-                time_pattern = r'\d{1,2}:\d{2}\s?[APM]{2}'
-                times = re.findall(time_pattern, container.get_text())
+                # Timing extraction (Searching for text like 10:30 AM/PM)
+                all_text = container.get_text(separator=' ')
+                times = re.findall(r'\d{1,2}:\d{2}\s?(?:AM|PM|am|pm)', all_text)
                 
                 if name and times:
                     movie_results.append({"name": name, "times": list(dict.fromkeys(times))})
-            
-            # Backup: If structured search fails, get ANY movie-like name and time
-            if not movie_results:
-                raw_text = soup.get_text(separator=' ')
-                # This finds any movie name pattern + time pattern
-                pass 
 
     except Exception as e:
         print(f"Bypass Error: {e}")
@@ -55,8 +46,8 @@ def run_all():
     msg = f"🎬 *LA CINEMAS (MARIS) - MASTER UPDATES* 🎬\n🕒 {time_str}\n━━━━━━━━━━━━━━━━━━━━\n"
     
     if not movies:
-        msg += "📊 *Status:* Data Hidden by BMS Security.\n"
-        msg += "💡 _Code logic updated to bypass new layout._\n"
+        msg += "📊 *Status:* Waiting for BMS Timings to load...\n"
+        msg += "💡 _Code is deep-scanning the dynamic layout._\n"
     else:
         for m in movies:
             msg += f"🎥 *{m['name']}*\n🕒 {', '.join(m['times'])}\n\n"
