@@ -1,7 +1,12 @@
 from flask import Flask
-import bot  # Steel scraper
-import movies # Movie scraper
 import threading
+import movies # Movie scraper file
+
+# 'bot.py' file illai na error varaama irukka intha logic
+try:
+    import bot # Steel scraper
+except ImportError:
+    bot = None
 
 app = Flask(__name__)
 
@@ -11,9 +16,11 @@ def home():
 
 @app.route('/run-steel')
 def trigger_steel():
-    # Running in thread to avoid Render timeout
-    threading.Thread(target=bot.send_update).start()
-    return "Steel Update Triggered!"
+    if bot:
+        threading.Thread(target=bot.send_update).start()
+        return "Steel Update Triggered!"
+    else:
+        return "Error: bot.py file not found in server!"
 
 @app.route('/run-movies')
 def trigger_movies():
