@@ -8,52 +8,54 @@ CHAT_ID = "1115358053"
 API_KEY = "1c52b530-7d6e-4a64-b061-85cc76e6e937"
 
 def get_movie_timings():
-    # April 2nd Page URL
+    # April 2nd URL - Iniki date exact-aa target panrom
     target_url = "https://in.bookmyshow.com/buytickets/la-cinemas-maris-trichy/cinema-trich-LATG-MT/20260402"
     
-    # wait_for=.showtime-pill makes the scraper wait until the actual timing pills appear on screen
-    proxy_url = f"https://api.webscraping.ai/html?api_key={API_KEY}&url={target_url}&proxy=residential&render=true&wait_for=.showtime-pill&timeout=30000"
+    # wait_for=.showtime-pill + render=true + residential proxy
+    # Intha combo thaan BMS-oda security-ah udaikkum
+    proxy_url = f"https://api.webscraping.ai/html?api_key={API_KEY}&url={target_url}&proxy=residential&render=true&wait_for=.showtime-pill"
     
     movie_results = []
     try:
-        # Long timeout because residential + waiting for element is slow
+        # Increase timeout to 180s for heavy page loading
         response = requests.get(proxy_url, timeout=180)
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
             
-            # Finding movie blocks (li.list is the standard BMS block)
-            containers = soup.select('li.list, .movie-card, .listing-info')
+            # BMS layout check: movie listings usually in 'li' with class 'list'
+            containers = soup.select('li.list')
             
             for container in containers:
-                # Precise name extraction
+                # Name extraction
                 name_tag = container.find(attrs={"data-event-title": True})
-                if name_tag:
-                    name = name_tag['data-event-title']
-                else:
+                name = name_tag['data-event-title'] if name_tag else ""
+                
+                if not name:
                     name_tag = container.select_one('.movie-name, .name, strong')
                     name = name_tag.get_text(strip=True) if name_tag else ""
 
-                # Precise timing extraction
-                time_tags = container.find_all('a', class_=re.compile(r'showtime|pill|session|time', re.I))
-                times = [t.get_text(strip=True) for t in time_tags if re.search(r'\d{1,2}:\d{2}', t.get_text())]
+                # Timing extraction
+                time_tags = container.find_all('a', class_=re.compile(r'showtime|pill|session', re.I))
+                times = [t.get_text(strip=True) for t in time_tags if ":" in t.get_text()]
                 
                 if name and times:
                     movie_results.append({"name": name, "times": list(dict.fromkeys(times))})
 
     except Exception as e:
-        print(f"Bypass Error: {e}")
+        print(f"Scrape Error: {e}")
     return movie_results
 
 def run_all():
     movies = get_movie_timings()
+    ist_now = datetime.utcnow() + timedelta(hours=5, minutes=30)
+    time_str = ist_now.strftime("%d-%m-%Y | %I:%M %p")
     
-    msg = f"🎬 *LA CINEMAS (MARIS) - THU 02 APR* 🎬\n━━━━━━━━━━━━━━━━━━━━\n"
+    msg = f"🎬 *LA CINEMAS (MARIS) - LIVE UPDATES* 🎬\n📅 *DATE:* 02-04-2026\n🕒 {time_str}\n━━━━━━━━━━━━━━━━━━━━\n"
     
     if not movies:
-        msg += "📊 *Status:* Data Hidden by BMS Script.\n"
-        msg += "💡 _Retrying with extended bypass logic..._\n"
+        msg += "📊 *Status:* Theater syncing live timings...\n"
+        msg += "💡 _BMS security is high today. Please try again later._\n"
     else:
-        # Displaying with proper formatting
         for m in movies:
             msg += f"🎥 *{m['name'].upper()}*\n🕒 {', '.join(m['times'])}\n\n"
             
