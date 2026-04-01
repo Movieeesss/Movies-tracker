@@ -10,7 +10,7 @@ API_KEY = "f1616ee794ad045c5d214aba40fda508"
 
 def get_trichy_movies():
     # Trichy movies exploration page
-    target_url = "https://in.bookmyshow.com/explore/movies-tiruchirappalli"
+    target_url = "https://in.bookmyshow.com/explore/explore/home/trichy"
     
     # Render=true kudutha thaan antha movie cards load aagum
     proxy_url = f"https://api.webscraping.ai/html?api_key={API_KEY}&url={target_url}&proxy=residential&render=true&wait=15000"
