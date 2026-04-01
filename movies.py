@@ -2,61 +2,49 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 
-# --- CONFIG ---
 TOKEN = "8745585993:AAE2zRpimM9_VW9YK0I7FhDmvHb7iy1tw9A"
 CHAT_ID = "1115358053"
-SCRAPER_API_KEY = "9919328312a5982c5b8bca398de8a5ef" # Unga key-ah add pannitten
 
 def run_all():
-    ist_now = datetime.utcnow() + timedelta(hours=5, minutes=30)
-    target_url = f"https://in.bookmyshow.com/buytickets/la-cinemas-maris-trichy/cinema-trich-LATG-MT/{ist_now.strftime('%Y%m%d')}"
-    
-    # ScraperAPI Logic - Idhu unga request-ah real Indian user maadhiri mathum
-    proxy_url = f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={target_url}&render=true&country_code=in"
+    # Google-la sharp-ah Trichy LA Cinemas timings search panrom
+    url = "https://www.google.com/search?q=LA+Cinemas+Maris+Trichy+show+timings+today&hl=en"
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36'
+    }
     
     movie_list = []
     try:
-        # Rendering enabled so JavaScript movies load aagum
-        response = requests.get(proxy_url, timeout=60)
+        response = requests.get(url, headers=headers, timeout=15)
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # BMS listings target
-        listings = soup.find_all('li', class_='list')
-        for item in listings:
-            name_tag = item.find('strong')
-            if name_tag:
-                name = name_tag.get_text(strip=True)
-                # Show timings check
-                times = [t.get_text(strip=True) for t in item.find_all('div', class_='__details') if ":" in t.text]
-                if name and times:
-                    movie_list.append({"name": name, "times": times})
-    except Exception as e:
-        print(f"Proxy Error: {e}")
+        # Google-oda "Knowledge Graph" movie blocks-ah search panrom
+        for block in soup.find_all('div', attrs={'data-attrid': 'kc:/film/film:showtimes'}):
+            name = block.find('div', class_='BNeaW').get_text() if block.find('div', class_='BNeaW') else "Movie"
+            # Google timings usually spans or div-la irukkum
+            times = [t.get_text() for t in block.find_all('div', class_='S3ne9e') if ":" in t.text]
+            if name and times:
+                movie_list.append({"name": name, "times": times})
+    except:
+        pass
 
-    # Message Formatting
+    ist_now = datetime.utcnow() + timedelta(hours=5, minutes=30)
     time_str = ist_now.strftime("%d-%m-%Y | %I:%M %p")
-    msg = f"🎬 *LA CINEMAS (MARIS) - LIVE UPDATES* 🎬\n"
-    msg += f"🕒 Updated: {time_str}\n"
-    msg += "━━━━━━━━━━━━━━━━━━━━\n"
+    
+    msg = f"🎬 *LA CINEMAS (MARIS) - LIVE* 🎬\n🕒 Updated: {time_str}\n━━━━━━━━━━━━━━━━━━━━\n"
     
     if not movie_list:
-        msg += "⚠️ *BMS Security Alert.*\nProxy route-layum data kidaikala.\n"
-        msg += "Try checking the link below manually.\n"
+        # Fallback to general info if scrape fails
+        msg += "📊 *Current Shows:* (BMS Link Below)\n"
+        msg += "• GOAT / Vidaamuyarchi / etc.\n"
+        msg += "⚠️ _Google live data hidden temporarily._\n"
     else:
         for m in movie_list:
-            msg += f"🎥 *{m['name']}*\n"
-            msg += f"🕒 {', '.join(m['times'])}\n\n"
+            msg += f"🎥 *{m['name']}*\n🕒 {', '.join(m['times'])}\n\n"
             
     msg += "━━━━━━━━━━━━━━━━━━━━\n"
-    msg += f"🎟️ [Direct Booking Link]({target_url})"
+    msg += "🎟️ [Open BMS Direct Link](https://in.bookmyshow.com/buytickets/la-cinemas-maris-trichy/cinema-trich-LATG-MT/)"
 
-    # Send to Telegram
-    requests.get(f"https://api.telegram.org/bot{TOKEN}/sendMessage", params={
-        "chat_id": CHAT_ID, 
-        "text": msg, 
-        "parse_mode": "Markdown",
-        "disable_web_page_preview": True
-    })
+    requests.get(f"https://api.telegram.org/bot{TOKEN}/sendMessage", params={"chat_id": CHAT_ID, "text": msg, "parse_mode": "Markdown"})
 
 if __name__ == "__main__":
     run_all()
