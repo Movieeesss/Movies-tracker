@@ -8,7 +8,7 @@ CHAT_ID = "1115358053"
 API_KEY = "1c52b530-7d6e-4a64-b061-85cc76e6e937"
 
 def get_trichy_movies():
-    target_url = "https://in.bookmyshow.com/explore/movies-tiruchirappalli"
+    target_url = "https://in.bookmyshow.com/explore/movies-Trichy"
     # WebScraping.AI settings
     proxy_url = f"https://api.webscraping.ai/html?api_key={API_KEY}&url={target_url}&proxy=residential&render=true&wait=20000"
     
