@@ -8,11 +8,12 @@ CHAT_ID = "1115358053"
 API_KEY = "45b4f3e2-b8db-473c-8b38-374fa0b0febe"
 
 def get_la_cinemas_timings():
-    # Naalaikku (April 03) date calculate panrom
+    # April 03 date-ah dynamic-ah calculate panrom
     ist_tomorrow = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30, days=1)
-    date_str = ist_tomorrow.strftime("%Y%m%d") # Format: 20260403
+    date_str = ist_tomorrow.strftime("%Y%m%d")
     
-    target_url = f"https://in.bookmyshow.com/buytickets/la-cinema-maris-trichy/cinema-trch-LACN-MT/{date_str}"
+    # Neenga kudutha andha working URL format (LATG)
+    target_url = f"https://in.bookmyshow.com/buytickets/la-cinema-maris-trichy/cinema-trch-LATG-MT/{date_str}"
     proxy_url = f"https://api.webscraping.ai/html?api_key={API_KEY}&url={target_url}&proxy=residential&render=true&wait=15000"
     
     theater_data = {}
@@ -21,25 +22,24 @@ def get_la_cinemas_timings():
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
             
-            # BMS-la ovvoru movie-um 'list' class ulla irukkum
+            # Movies list check panrom
             movie_containers = soup.find_all('li', class_='list')
             
             for container in movie_containers:
-                # Movie Name extraction
                 name_tag = container.find('a', class_='__movie-name')
                 if not name_tag: continue
                 movie_name = name_tag.get_text().strip().upper()
                 
-                # Show timings extraction
-                # Multiple possible classes-ah check panrom
-                time_tags = container.find_all(['div', 'a'], class_=lambda x: x and ('showtime-pill' in x or 'time' in x.lower()))
-                
+                # Timings extraction logic
                 timings = []
+                # Pill tags and session links check panrom
+                time_tags = container.select('.showtime-pill, .__showtime, .__session-link')
+                
                 for t_tag in time_tags:
                     time_text = t_tag.get_text().strip()
-                    # Filtering: 11:00 AM maari format-la irukra text-ah mattum edukka
-                    if any(char.isdigit() for char in time_text) and (":" in time_text):
-                        # Text-la irukra extra details (Dolby, 4K) remove panna split panrom
+                    # Filter for 11:00 AM maari irukra time formats
+                    if ":" in time_text and any(c.isdigit() for c in time_text):
+                        # Extra info-ah clean panrom (e.g., Dolby 4K)
                         clean_time = time_text.split('\n')[0].strip()
                         if clean_time not in timings:
                             timings.append(clean_time)
@@ -47,15 +47,14 @@ def get_la_cinemas_timings():
                 if movie_name and timings:
                     theater_data[movie_name] = sorted(list(set(timings)))
         else:
-            print(f"Scraper Error: {response.status_code}")
+            print(f"Error: {response.status_code}")
     except Exception as e:
-        print(f"Connection Error: {e}")
+        print(f"Error: {e}")
         
     return theater_data, date_str
 
 def run_all():
     data, check_date = get_la_cinemas_timings()
-    
     ist_now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
     time_str = ist_now.strftime("%d-%m-%Y | %I:%M %p")
     formatted_date = datetime.strptime(check_date, "%Y%m%d").strftime("%d-%b")
@@ -64,14 +63,15 @@ def run_all():
     meta = f"🕒 Updated: {time_str}\n━━━━━━━━━━━━━━━━━━━━\n"
     
     if not data:
-        body = f"⚠️ *Status:* Booking data not found for {formatted_date} yet.\n"
+        # Inga error URL-ayum anuppalam, so trace panna easy-ah irukkum
+        body = f"⚠️ *Status:* Booking not detected on LATG page for {formatted_date}."
     else:
         body = ""
         for movie, timings in data.items():
             body += f"🎥 *{movie}*\n"
             body += f"🕒 {' | '.join(timings)}\n\n"
             
-    footer = f"━━━━━━━━━━━━━━━━━━━━\n👉 [Book Now](https://in.bookmyshow.com/buytickets/la-cinema-maris-trichy/cinema-trch-LACN-MT/{check_date})"
+    footer = f"━━━━━━━━━━━━━━━━━━━━\n👉 [Book Now](https://in.bookmyshow.com/buytickets/la-cinema-maris-trichy/cinema-trch-LATG-MT/{check_date})"
     
     final_msg = header + meta + body + footer
     requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
