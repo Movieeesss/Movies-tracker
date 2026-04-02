@@ -1,20 +1,21 @@
 from flask import Flask
 import threading
 import os
-import movies 
+import movies # movies.py file-ah import pannuthu 
 
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Server is Running", 200
+    return "Movie Tracker is Live!", 200
 
 @app.route('/run-movies')
 def trigger_movies():
-    # Background-la run panna thread start panrom
+    # Background Thread: Ithu thaan cron-job timeout aagaama thadukkum 
+    # Hit panna udane 'OK' response anuppidum, scraper background-la run aagum 
     thread = threading.Thread(target=movies.run_all)
     thread.start()
-    # Simple message for Cron-job.org to avoid 'Output too large'
+    # "OK" mattum return pannurathaala Cron-job-org-la 'Output too large' error varathu
     return "OK", 200
 
 if __name__ == "__main__":
