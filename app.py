@@ -1,21 +1,21 @@
 from flask import Flask
 import threading
 import os
-import movies # Unga movies.py file-ah import pannuthu
+import movies 
 
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Movie Tracker is Live!", 200
+    return "Server is Running", 200
 
 @app.route('/run-movies')
 def trigger_movies():
-    # Background Thread: Ithu thaan cron-job timeout aagaama thadukkum
-    # Hit panna udane 'OK' response anuppidum, scraper background-la run aagum
+    # Background-la run panna thread start panrom
     thread = threading.Thread(target=movies.run_all)
     thread.start()
-    return "Scraper Started in Background", 200
+    # Simple message for Cron-job.org to avoid 'Output too large'
+    return "OK", 200
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
