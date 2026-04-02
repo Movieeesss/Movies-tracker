@@ -8,28 +8,29 @@ CHAT_ID = "1115358053"
 API_KEY = "1c52b530-7d6e-4a64-b061-85cc76e6e937"
 
 def get_trichy_movies():
-    target_url = "https://in.bookmyshow.com/explore/movies-Trichy"
-    # WebScraping.AI settings
-    proxy_url = f"https://api.webscraping.ai/html?api_key={API_KEY}&url={target_url}&proxy=residential&render=true&wait=20000"
+    # Corrected URL for Trichy
+    target_url = "https://in.bookmyshow.com/explore/movies-tiruchirappalli"
+    
+    # CRITICAL FIX: Wait time changed from 20000 to 10000 to fit Cron-job.org's 30s limit
+    proxy_url = f"https://api.webscraping.ai/html?api_key={API_KEY}&url={target_url}&proxy=residential&render=true&wait=10000"
     
     movie_list = []
     try:
-        # Timeout 120s kuduthurukkom because wait=20s + rendering time edukum
-        response = requests.get(proxy_url, timeout=150)
+        # Timeout set to 25s so it fails internally before Cron-job kills it at 30s
+        response = requests.get(proxy_url, timeout=25)
         
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
-            # Movie names posters-la irunthe edukkuroom
+            # Extract movie names from image alt tags
             images = soup.find_all('img', alt=True)
             for img in images:
                 name = img['alt'].strip().upper()
-                # Filtering useless tags
-                if any(x in name for x in ["BMS", "LOGO", "BANNER", "APP", "BOOKMYSHOW", "OFFER", "STREAM"]):
+                # Advanced filtering to remove noise
+                if any(x in name for x in ["BMS", "LOGO", "BANNER", "APP", "BOOKMYSHOW", "OFFER", "STREAM", "PROMO"]):
                     continue
                 if len(name) > 3 and name not in movie_list:
                     movie_list.append(name)
         else:
-            # Error vantha verum status code mattum print aagum (Not full HTML)
             print(f"Scraper Error: Status {response.status_code}")
             
     except Exception as e:
@@ -38,13 +39,13 @@ def get_trichy_movies():
     return sorted(movie_list)
 
 def run_all():
-    # 1. Start Notification
+    # 1. Notify start (Optional, but useful to know the script is alive)
     requests.get(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
                  params={"chat_id": CHAT_ID, "text": "🔄 *Checking Trichy Movies...*", "parse_mode": "Markdown"})
     
     movies = get_trichy_movies()
     
-    # Time logic updated for latest Python versions
+    # IST Time calculation
     ist_now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
     time_str = ist_now.strftime("%d-%m-%Y | %I:%M %p")
     
@@ -52,7 +53,7 @@ def run_all():
     meta = f"🕒 {time_str}\n━━━━━━━━━━━━━━━━━━━━\n"
     
     if not movies:
-        body = "📊 *Status:* Movies list empty. Scraper busy or page not loaded properly.\n"
+        body = "📊 *Status:* No movies found. (Could be a slow proxy or page layout change).\n"
     else:
         body = "🎥 *RECOMMENDED MOVIES:*\n\n"
         for m in movies:
@@ -60,13 +61,13 @@ def run_all():
             
     footer = "\n━━━━━━━━━━━━━━━━━━━━\n👉 [Open BMS](https://in.bookmyshow.com/explore/movies-tiruchirappalli)"
     
-    # 2. Final Telegram message
+    # 2. Send the final list to Telegram
     final_msg = header + meta + body + footer
     tg_response = requests.get(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
                                params={"chat_id": CHAT_ID, "text": final_msg, "parse_mode": "Markdown"})
 
-    # --- CRITICAL FIX FOR CRON-JOB.ORG ---
-    # Inga periya string ethaiyume print panna koodathu
+    # --- FINAL CLEANUP FOR CRON-JOB.ORG ---
+    # We print only a tiny string to keep output size small
     if tg_response.status_code == 200:
         print("Success: Telegram notification sent.")
     else:
