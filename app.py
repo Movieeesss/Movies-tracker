@@ -7,14 +7,14 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "LA Cinema LATG Tracker Active", 200
+    return "LA Cinema Live Tracker Running", 200
 
 @app.route('/run-movies')
 def trigger_movies():
-    # Background thread starts scraping
+    # Run scraper in background to avoid timeout
     thread = threading.Thread(target=movies.run_all)
     thread.start()
-    # Simple 'OK' avoids 'Output too large' on cron-job.org
+    # Return minimal response for Cron-job.org
     return "OK", 200
 
 if __name__ == "__main__":
