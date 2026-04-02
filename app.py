@@ -7,12 +7,14 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "LA Cinemas Tracker Active", 200
+    return "LA Cinema Tracker is Live!", 200
 
 @app.route('/run-movies')
 def trigger_movies():
+    # Background thread start panrom
     thread = threading.Thread(target=movies.run_all)
     thread.start()
+    # Romba chinna response, so "Output Too Large" error varaadhu
     return "OK", 200
 
 if __name__ == "__main__":
