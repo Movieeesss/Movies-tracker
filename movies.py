@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 # --- CONFIGURATION --- 
 TOKEN = "8745585993:AAE2zRpimM9_VW9YK0I7FhDmvHb7iy1tw9A"
 CHAT_ID = "1115358053"
-API_KEY = "45b4f3e2-b8db-473c-8b38-374fa0b0febe"
+API_KEY = "f1616ee794ad045c5d214aba40fda508"
 
 def get_trichy_movies():
     target_url = "https://in.bookmyshow.com/explore/movies-trichy"
