@@ -7,14 +7,14 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "LA Cinema Tracker is Live!", 200
+    return "LA Cinema LATG Tracker Active", 200
 
 @app.route('/run-movies')
 def trigger_movies():
-    # Background thread start panrom
+    # Background thread starts scraping
     thread = threading.Thread(target=movies.run_all)
     thread.start()
-    # Romba chinna response, so "Output Too Large" error varaadhu
+    # Simple 'OK' avoids 'Output too large' on cron-job.org
     return "OK", 200
 
 if __name__ == "__main__":
