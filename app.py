@@ -7,16 +7,16 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Movie Tracker is Active!"
+    return "Movie Tracker is Live!"
 
 @app.route('/run-movies')
 def trigger_movies():
-    # Threading use pannuraathaala Cron-job timeout aagaathu
+    # Background-la oduna thaan Cron-job timeout aagathu
     thread = threading.Thread(target=run_all)
     thread.start()
-    return "Scraper Started", 200
+    return "Scraper Started Successfully", 200
 
 if __name__ == "__main__":
-    # Render-ku PORT env variable romba mukkiyam
+    # RENDER FIX: Dynamic port binding
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
