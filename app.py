@@ -1,7 +1,7 @@
-from flask import Flask
+from flask import Flask, jsonify
 import threading
 import os
-import movies # movies.py file-ah import pannuthu 
+import movies 
 
 app = Flask(__name__)
 
@@ -11,12 +11,12 @@ def home():
 
 @app.route('/run-movies')
 def trigger_movies():
-    # Background Thread: Ithu thaan cron-job timeout aagaama thadukkum 
-    # Hit panna udane 'OK' response anuppidum, scraper background-la run aagum 
+    # Background-la process start aagum
     thread = threading.Thread(target=movies.run_all)
     thread.start()
-    # "OK" mattum return pannurathaala Cron-job-org-la 'Output too large' error varathu
-    return "OK", 200
+    
+    # Very small JSON response to avoid 'Output too large' error
+    return jsonify({"status": "triggered"}), 200
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
