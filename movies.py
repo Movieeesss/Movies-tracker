@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 TOKEN = "8745585993:AAE2zRpimM9_VW9YK0I7FhDmvHb7iy1tw9A"
 API_KEY = "45b4f3e2-b8db-473c-8b38-374fa0b0febe"
 USER_FILE = "users.json"
+MY_ID = 1115358053  # Unga permanent ID
 
 def get_trichy_movies():
     target_url = "https://in.bookmyshow.com/explore/movies-trichy"
@@ -23,10 +24,8 @@ def get_trichy_movies():
                     blacklist = ["BOOKING", "TICKET", "WATCH", "CLICK", "OFFER", "LATEST", "BMS", "SCREEN"]
                     if not any(x in name for x in blacklist):
                         movie_list.add(name)
-        else:
-            print(f"Scraper Error: Status {response.status_code}")
     except Exception as e:
-        print(f"Connection Error: {e}")
+        print(f"Scraper Error: {e}")
         
     return sorted(list(movie_list))
 
@@ -48,21 +47,25 @@ def run_all():
     footer = "\n━━━━━━━━━━━━━━━━━━━━\n👉 [Open BMS](https://in.bookmyshow.com/explore/movies-trichy)"
     final_msg = header + meta + body + footer
 
-    # MULTIPLE USERS-ku anuppura logic
+    # Ellarukum anuppura logic
+    user_list = [MY_ID] # Unga ID eppovume irukum
+    
     if os.path.exists(USER_FILE):
         with open(USER_FILE, "r") as f:
             try:
-                users = json.load(f)
-            except: users = []
+                extra_users = json.load(f)
+                for u in extra_users:
+                    if u not in user_list:
+                        user_list.append(u)
+            except: pass
             
-        for user_id in users:
-            try:
-                requests.post(
-                    f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
-                    data={"chat_id": user_id, "text": final_msg, "parse_mode": "Markdown", "disable_web_page_preview": "true"}
-                )
-            except Exception as e:
-                print(f"Error sending to {user_id}: {e}")
+    for user_id in user_list:
+        try:
+            requests.post(
+                f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
+                data={"chat_id": user_id, "text": final_msg, "parse_mode": "Markdown", "disable_web_page_preview": "true"}
+            )
+        except: pass
 
 if __name__ == "__main__":
     run_all()
