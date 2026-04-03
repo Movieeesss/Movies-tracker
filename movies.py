@@ -7,80 +7,68 @@ from datetime import datetime, timedelta, timezone
 
 # --- CONFIGURATION ---
 TOKEN = "8745585993:AAE2zRpimM9_VW9YK0I7FhDmvHb7iy1tw9A"
-# ScrapingBee API Key
 API_KEY = "MKDCNDT9VWVFGX57CQ5NCR9R40F4FZWHDSLF98Z1KEK0NN5F9ZNKOM6GT5UDKD9YB6IO3A7WLNAAEHY0"
+MY_ID = 1115358053
 USER_FILE = "users.json"
-MY_ID = 1115358053  
 
 def get_bms_tomorrow_heavy_mode():
-    # April 4 tomorrow link for LA Cinema Maris
     target_url = "https://in.bookmyshow.com/cinemas/trichy/la-cinema-maris-trichy/buytickets/LATG/20260404"
     
-    # OPTION A: MAX POWER SETTINGS
+    # MAX POWER SETTINGS
     params = {
         'api_key': API_KEY,
         'url': target_url,
         'render_js': 'true',
-        'wait': '30000',        # 30 SECONDS WAIT (Max for BMS load)
-        'premium_proxy': 'true', # Using Premium Residential Proxies
-        'country_code': 'in'     # Targeting Indian region
+        'wait': '30000',        # 30 SECONDS WAIT
+        'premium_proxy': 'true', 
+        'country_code': 'in'
     }
     
     movie_report = []
     try:
-        # Hitting ScrapingBee API with high timeout (90s)
-        response = requests.get('https://app.scrapingbee.com/api/v1/', params=params, timeout=90)
+        # High timeout for heavy scraping
+        response = requests.get('https://app.scrapingbee.com/api/v1/', params=params, timeout=95)
         
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
-            
-            # BMS tomorrow's layout logic
-            # Finding every movie block in the list
             rows = soup.find_all('li', class_='list-item')
             
             for row in rows:
-                # 1. Movie Name target
                 title_tag = row.find('a', class_='__movie-name') or row.find('strong')
                 if not title_tag: continue
                 title = title_tag.get_text(strip=True).upper()
                 
-                # 2. Advanced Timing Filter using Regex
-                # Looks for patterns like 10:45 AM or 02:30 PM in the row text
+                # Extracting timings using text patterns
                 raw_text = row.get_text(separator=" ", strip=True)
                 timings = re.findall(r'\d{1,2}:\d{2}\s?(?:AM|PM)?', raw_text, re.I)
                 
                 if title and timings:
-                    # Clean and sort unique showtimes
                     unique_times = " | ".join(sorted(list(set(timings))))
                     movie_report.append(f"🎬 *{title}*\n🕒 {unique_times}")
                     
         return movie_report
     except Exception as e:
-        print(f"Heavy Scraper Error: {e}")
+        print(f"Scraper Error: {e}")
         return []
 
 def run_all():
-    # Sending initial status to Telegram
-    requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
-                  data={"chat_id": MY_ID, "text": "🐝 *Heavy Mode: 30s Scan Started for Tomorrow's Movies...*", "parse_mode": "Markdown"})
-    
-    movies = get_bms_tomorrow_heavy_mode()
+    data = get_bms_tomorrow_heavy_mode()
     
     ist_now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
     time_str = ist_now.strftime("%d-%m-%Y | %I:%M %p")
     
-    header = "🎥 *LA CINEMA (MARIS) - TOMORROW (APR 4)* 🎥\n"
+    header = "🎥 *LA CINEMA (MARIS) - TOMORROW* 🎥\n"
     meta = f"🕒 Generated: {time_str}\n━━━━━━━━━━━━━━━━━━━━\n"
     
-    if not movies:
-        body = "⚠️ *Status:* No timings detected even in Heavy Mode.\n_Reason: Site might have blocked the Premium Proxy or No shows yet._"
+    if not data:
+        body = "⚠️ *Status:* No timings found.\n_Reason: Site rendering took too long._"
     else:
-        body = "\n\n".join(movies)
+        body = "\n\n".join(data)
             
-    footer = "\n━━━━━━━━━━━━━━━━━━━━\n🎫 [Book Online](https://in.bookmyshow.com/cinemas/trichy/la-cinema-maris-trichy/buytickets/LATG/20260404)"
+    footer = "\n━━━━━━━━━━━━━━━━━━━━\n🎫 Book: [lacucinema.com](https://www.lacucinema.com/)"
     final_msg = header + meta + body + footer
 
-    # Send to all saved users
+    # Send to users
     user_list = [MY_ID]
     if os.path.exists(USER_FILE):
         with open(USER_FILE, "r") as f:
