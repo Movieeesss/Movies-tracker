@@ -11,76 +11,68 @@ API_KEY = "MKDCNDT9VWVFGX57CQ5NCR9R40F4FZWHDSLF98Z1KEK0NN5F9ZNKOM6GT5UDKD9YB6IO3
 USER_FILE = "users.json"
 MY_ID = 1115358053  
 
-def get_bms_trichy_tomorrow_timings():
-    # Specific URL for April 4, 2026 (Tomorrow)
+def get_bms_tomorrow_pakkava_timings():
+    # April 4 tomorrow link
     target_url = "https://in.bookmyshow.com/cinemas/trichy/la-cinema-maris-trichy/buytickets/LATG/20260404"
     
     params = {
         'api_key': API_KEY,
         'url': target_url,
         'render_js': 'true',
-        'wait': '15000', # 15s wait for the green buttons to fully render
-        'premium_proxy': 'true',
-        'country_code': 'in'
+        'wait': '20000', # 20s wait! Full-ah render aana thaan timings kidaikum
+        'premium_proxy': 'true'
     }
     
-    movie_list = []
+    movie_report = []
     try:
-        # ScrapingBee API hit
-        response = requests.get('https://app.scrapingbee.com/api/v1/', params=params, timeout=70)
+        response = requests.get('https://app.scrapingbee.com/api/v1/', params=params, timeout=80)
         
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
             
-            # BMS tomorrow's page layout selection
-            # 'list-item' is the standard row for each movie
-            movie_rows = soup.select('.list-item') or soup.find_all('li', class_='list-item')
+            # BMS tomorrow page-la ovvoru movie row-vum 'list-item' class-la irukkum
+            rows = soup.find_all('li', class_='list-item')
             
-            for row in movie_rows:
-                # Movie Name extraction
-                title_tag = row.find('a', class_='__movie-name') or row.find('strong')
-                if title_tag:
-                    title = title_tag.get_text(strip=True).upper()
+            for row in rows:
+                # 1. Movie Name target
+                title_tag = row.find('a', class_='__movie-name')
+                if not title_tag: continue
+                title = title_tag.get_text(strip=True).upper()
+                
+                # 2. Timings target (Finding all spans with time pattern)
+                # Regex looks for 10:45 AM, 02:30 PM etc.
+                raw_text = row.get_text(separator=" ", strip=True)
+                timings = re.findall(r'\d{1,2}:\d{2}\s?(?:AM|PM)?', raw_text, re.I)
+                
+                if title and timings:
+                    # Remove duplicates and clean
+                    unique_times = " | ".join(sorted(list(set(timings))))
+                    movie_report.append(f"🎬 *{title}*\n🕒 {unique_times}")
                     
-                    # Showtimes extraction - specific targeting for the timing spans
-                    time_tags = row.find_all(['div', 'span', 'a'], class_=re.compile(r'showtime|link|time'))
-                    timings = []
-                    for t in time_tags:
-                        t_text = t.get_text(strip=True)
-                        # Regular expression to catch 10:45 AM / 02:30 PM format
-                        match = re.search(r'\d{1,2}:\d{2}\s?(?:AM|PM)?', t_text, re.I)
-                        if match:
-                            timings.append(match.group().strip())
-                    
-                    if title and timings:
-                        # Sorting and unique timings
-                        clean_times = " | ".join(sorted(list(set(timings))))
-                        movie_list.append(f"🎬 *{title}*\n🕒 {clean_times}")
-                        
-        return movie_list
+        return movie_report
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Scraper Error: {e}")
         return []
 
 def run_all():
-    movies = get_bms_trichy_tomorrow_timings()
+    # Calling the new scrapper
+    movies = get_bms_tomorrow_pakkava_timings()
     
-    # Time formatting for report
     ist_now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
     time_str = ist_now.strftime("%d-%m-%Y | %I:%M %p")
     
     header = "🎥 *LA CINEMA (MARIS) - TOMORROW (APR 4)* 🎥\n"
-    meta = f"🕒 Report Generated: {time_str}\n━━━━━━━━━━━━━━━━━━━━\n"
+    meta = f"🕒 Generated: {time_str}\n━━━━━━━━━━━━━━━━━━━━\n"
     
     if not movies:
-        body = "⚠️ *Status:* No timings found for tomorrow.\n_Reason: Bookings might not have opened or site is slow._"
+        body = "⚠️ *Status:* No timings detected yet.\n_Reason: Site rendering slow or Booking not open._"
     else:
         body = "\n\n".join(movies)
             
-    footer = "\n━━━━━━━━━━━━━━━━━━━━\n🎫 [Book Now on BMS](https://in.bookmyshow.com/cinemas/trichy/la-cinema-maris-trichy/buytickets/LATG/20260404)"
+    footer = "\n━━━━━━━━━━━━━━━━━━━━\n🎫 [Book Online](https://in.bookmyshow.com/cinemas/trichy/la-cinema-maris-trichy/buytickets/LATG/20260404)"
     final_msg = header + meta + body + footer
 
-    # Send to users
+    # Broadcast logic
     user_list = [MY_ID]
     if os.path.exists(USER_FILE):
         with open(USER_FILE, "r") as f:
