@@ -1,68 +1,86 @@
 import requests
-from bs4 import BeautifulSoup
-import os
 import json
+import os
+import re
+from bs4 import BeautifulSoup
 from datetime import datetime, timedelta, timezone
 
 # --- CONFIGURATION ---
 TOKEN = "8745585993:AAE2zRpimM9_VW9YK0I7FhDmvHb7iy1tw9A"
+# ScrapingBee API Key
 API_KEY = "MKDCNDT9VWVFGX57CQ5NCR9R40F4FZWHDSLF98Z1KEK0NN5F9ZNKOM6GT5UDKD9YB6IO3A7WLNAAEHY0"
-MY_ID = 1115358053
 USER_FILE = "users.json"
+MY_ID = 1115358053  
 
-def get_movies_from_google():
-    # Target: Tomorrow's timings for LA Cinema Maris
-    search_url = "https://www.google.com/search?q=LA+Cinema+Maris+Trichy+movie+timings+tomorrow"
+def get_bms_tomorrow_heavy_mode():
+    # April 4 tomorrow link for LA Cinema Maris
+    target_url = "https://in.bookmyshow.com/cinemas/trichy/la-cinema-maris-trichy/buytickets/LATG/20260404"
     
+    # OPTION A: MAX POWER SETTINGS
     params = {
         'api_key': API_KEY,
-        'url': search_url,
+        'url': target_url,
         'render_js': 'true',
-        'premium_proxy': 'true',
-        'country_code': 'in',
-        'wait': '5000'
+        'wait': '30000',        # 30 SECONDS WAIT (Max for BMS load)
+        'premium_proxy': 'true', # Using Premium Residential Proxies
+        'country_code': 'in'     # Targeting Indian region
     }
     
-    movie_results = []
+    movie_report = []
     try:
-        response = requests.get('https://app.scrapingbee.com/api/v1/', params=params, timeout=60)
+        # Hitting ScrapingBee API with high timeout (90s)
+        response = requests.get('https://app.scrapingbee.com/api/v1/', params=params, timeout=90)
+        
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
             
-            # Google often lists timings in 'Vkp9Pc' or common snippets
-            # Namma generic text search panni timings-ah filter pannuvom
-            potential_blocks = soup.find_all(['div', 'span'])
+            # BMS tomorrow's layout logic
+            # Finding every movie block in the list
+            rows = soup.find_all('li', class_='list-item')
             
-            for block in potential_blocks:
-                text = block.get_text(strip=True)
-                # Looking for Movie titles and AM/PM timings
-                if ("AM" in text or "PM" in text) and ":" in text:
-                    if len(text) > 10 and len(text) < 200:
-                        movie_results.append(f"🎬 {text}")
-                        
-        return list(dict.fromkeys(movie_results))[:12]
+            for row in rows:
+                # 1. Movie Name target
+                title_tag = row.find('a', class_='__movie-name') or row.find('strong')
+                if not title_tag: continue
+                title = title_tag.get_text(strip=True).upper()
+                
+                # 2. Advanced Timing Filter using Regex
+                # Looks for patterns like 10:45 AM or 02:30 PM in the row text
+                raw_text = row.get_text(separator=" ", strip=True)
+                timings = re.findall(r'\d{1,2}:\d{2}\s?(?:AM|PM)?', raw_text, re.I)
+                
+                if title and timings:
+                    # Clean and sort unique showtimes
+                    unique_times = " | ".join(sorted(list(set(timings))))
+                    movie_report.append(f"🎬 *{title}*\n🕒 {unique_times}")
+                    
+        return movie_report
     except Exception as e:
-        print(f"Scraper Error: {e}")
+        print(f"Heavy Scraper Error: {e}")
         return []
 
 def run_all():
-    data = get_movies_from_google()
+    # Sending initial status to Telegram
+    requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
+                  data={"chat_id": MY_ID, "text": "🐝 *Heavy Mode: 30s Scan Started for Tomorrow's Movies...*", "parse_mode": "Markdown"})
+    
+    movies = get_bms_tomorrow_heavy_mode()
     
     ist_now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
     time_str = ist_now.strftime("%d-%m-%Y | %I:%M %p")
     
-    header = "🎥 *LA CINEMA (MARIS) - GOOGLE LIVE* 🎥\n"
-    meta = f"🕒 {time_str}\n━━━━━━━━━━━━━━━━━━━━\n"
+    header = "🎥 *LA CINEMA (MARIS) - TOMORROW (APR 4)* 🎥\n"
+    meta = f"🕒 Generated: {time_str}\n━━━━━━━━━━━━━━━━━━━━\n"
     
-    if not data:
-        body = "⚠️ *Status:* Data not captured. Google might be showing a different layout."
+    if not movies:
+        body = "⚠️ *Status:* No timings detected even in Heavy Mode.\n_Reason: Site might have blocked the Premium Proxy or No shows yet._"
     else:
-        body = "\n\n".join(data)
+        body = "\n\n".join(movies)
             
-    footer = "\n━━━━━━━━━━━━━━━━━━━━\n📊 Source: Google Search Cache"
+    footer = "\n━━━━━━━━━━━━━━━━━━━━\n🎫 [Book Online](https://in.bookmyshow.com/cinemas/trichy/la-cinema-maris-trichy/buytickets/LATG/20260404)"
     final_msg = header + meta + body + footer
 
-    # Broadcast to all users
+    # Send to all saved users
     user_list = [MY_ID]
     if os.path.exists(USER_FILE):
         with open(USER_FILE, "r") as f:
@@ -75,7 +93,7 @@ def run_all():
     for user_id in user_list:
         try:
             requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
-                          data={"chat_id": user_id, "text": final_msg, "parse_mode": "Markdown"})
+                          data={"chat_id": user_id, "text": final_msg, "parse_mode": "Markdown", "disable_web_page_preview": "true"})
         except: pass
 
 if __name__ == "__main__":
