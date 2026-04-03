@@ -7,7 +7,6 @@ import json
 app = Flask(__name__)
 USER_FILE = "users.json"
 
-# User ID-ah save panna function
 def save_user(chat_id):
     users = []
     if os.path.exists(USER_FILE):
@@ -25,7 +24,6 @@ def save_user(chat_id):
 def home():
     return "Movie Tracker is Live!", 200
 
-# Telegram webhook handle panna (For /start command)
 @app.route('/webhook', methods=['POST'])
 def webhook():
     data = request.get_json()
@@ -35,7 +33,6 @@ def webhook():
         
         if text == "/start":
             save_user(chat_id)
-            # Welcome message
             import requests
             requests.post(f"https://api.telegram.org/bot{movies.TOKEN}/sendMessage", 
                           data={"chat_id": chat_id, "text": "Welcome! Inime Trichy movies update ungaluku auto-va varum. 🎬"})
@@ -44,9 +41,9 @@ def webhook():
 
 @app.route('/run-movies')
 def trigger_movies():
-    thread = threading.Thread(target=movies.run_all)
-    thread.start()
-    return jsonify({"status": "triggered for all users"}), 200
+    # Threading problem-ah thavirkka direct-ah run panrom
+    movies.run_all()
+    return jsonify({"status": "Success", "message": "Updates sent to all users"}), 200
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
