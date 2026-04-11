@@ -1,87 +1,70 @@
 import requests
 import json
 import os
-import re
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta, timezone
 
-# --- CONFIGURATION ---
-TOKEN = "8529569809:AAFM-pmIKI5aVGvTSnGTr8ou9ogyAsus4VU"
+TOKEN = "8745585993:AAE2zRpimM9_VW9YK0I7FhDmvHb7iy1tw9A"
 API_KEY = "5a50f090-2bd7-442f-b0c6-3888ee7620c5"
-MY_ID = 1115358053
 USER_FILE = "users.json"
+MY_ID = 1115358053  # Unga permanent ID
 
-def get_bms_tomorrow_heavy_mode():
-    target_url = "https://in.bookmyshow.com/cinemas/trichy/la-cinema-maris-trichy/buytickets/LATG/20260404"
+def get_trichy_movies():
+    target_url = "https://in.bookmyshow.com/explore/movies-trichy"
+    proxy_url = f"https://api.webscraping.ai/html?api_key={API_KEY}&url={target_url}&proxy=residential&render=true&wait=10000"
     
-    # MAX POWER SETTINGS
-    params = {
-        'api_key': API_KEY,
-        'url': target_url,
-        'render_js': 'true',
-        'wait': '30000',        # 30 SECONDS WAIT
-        'premium_proxy': 'true', 
-        'country_code': 'in'
-    }
-    
-    movie_report = []
+    movie_list = set() 
     try:
-        # High timeout for heavy scraping
-        response = requests.get('https://app.scrapingbee.com/api/v1/', params=params, timeout=95)
-        
+        response = requests.get(proxy_url, timeout=45)
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
-            rows = soup.find_all('li', class_='list-item')
-            
-            for row in rows:
-                title_tag = row.find('a', class_='__movie-name') or row.find('strong')
-                if not title_tag: continue
-                title = title_tag.get_text(strip=True).upper()
-                
-                # Extracting timings using text patterns
-                raw_text = row.get_text(separator=" ", strip=True)
-                timings = re.findall(r'\d{1,2}:\d{2}\s?(?:AM|PM)?', raw_text, re.I)
-                
-                if title and timings:
-                    unique_times = " | ".join(sorted(list(set(timings))))
-                    movie_report.append(f"🎬 *{title}*\n🕒 {unique_times}")
-                    
-        return movie_report
+            for h3 in soup.find_all('h3'):
+                name = h3.get_text().strip().upper()
+                if 2 < len(name) < 50:
+                    blacklist = ["BOOKING", "TICKET", "WATCH", "CLICK", "OFFER", "LATEST", "BMS", "SCREEN"]
+                    if not any(x in name for x in blacklist):
+                        movie_list.add(name)
     except Exception as e:
         print(f"Scraper Error: {e}")
-        return []
+        
+    return sorted(list(movie_list))
 
 def run_all():
-    data = get_bms_tomorrow_heavy_mode()
-    
+    movies = get_trichy_movies()
     ist_now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
     time_str = ist_now.strftime("%d-%m-%Y | %I:%M %p")
     
-    header = "🎥 *LA CINEMA (MARIS) - TOMORROW* 🎥\n"
-    meta = f"🕒 Generated: {time_str}\n━━━━━━━━━━━━━━━━━━━━\n"
+    header = "🎬 *TRICHY MOVIES LIST* 🎬\n"
+    meta = f"🕒 {time_str}\n━━━━━━━━━━━━━━━━━━━━\n"
     
-    if not data:
-        body = "⚠️ *Status:* No timings found.\n_Reason: Site rendering took too long._"
+    if not movies:
+        body = "⚠️ *Status:* No movies detected.\n"
     else:
-        body = "\n\n".join(data)
+        body = "🎥 *NOW SHOWING:*\n\n"
+        for m in movies:
+            body += f"✅ *{m}*\n"
             
-    footer = "\n━━━━━━━━━━━━━━━━━━━━\n🎫 Book: [lacucinema.com](https://www.lacucinema.com/)"
+    footer = "\n━━━━━━━━━━━━━━━━━━━━\n👉 [Open BMS](https://in.bookmyshow.com/explore/movies-trichy)"
     final_msg = header + meta + body + footer
 
-    # Send to users
-    user_list = [MY_ID]
+    # Ellarukum anuppura logic
+    user_list = [MY_ID] # Unga ID eppovume irukum
+    
     if os.path.exists(USER_FILE):
         with open(USER_FILE, "r") as f:
             try:
                 extra_users = json.load(f)
                 for u in extra_users:
-                    if u not in user_list: user_list.append(u)
+                    if u not in user_list:
+                        user_list.append(u)
             except: pass
             
     for user_id in user_list:
         try:
-            requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
-                          data={"chat_id": user_id, "text": final_msg, "parse_mode": "Markdown", "disable_web_page_preview": "true"})
+            requests.post(
+                f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
+                data={"chat_id": user_id, "text": final_msg, "parse_mode": "Markdown", "disable_web_page_preview": "true"}
+            )
         except: pass
 
 if __name__ == "__main__":
