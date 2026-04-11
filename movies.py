@@ -4,7 +4,7 @@ import os
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta, timezone
 
-TOKEN = "8745585993:AAE2zRpimM9_VW9YK0I7FhDmvHb7iy1tw9A"
+TOKEN = "8529569809:AAFM-pmIKI5aVGvTSnGTr8ou9ogyAsus4VU"
 API_KEY = "5a50f090-2bd7-442f-b0c6-3888ee7620c5"
 USER_FILE = "users.json"
 MY_ID = 1115358053  # Unga permanent ID
