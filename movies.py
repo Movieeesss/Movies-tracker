@@ -10,31 +10,30 @@ USER_FILE = "users.json"
 MY_ID = 8095698350  # Unga permanent ID
 
 def get_trichy_movies():
-    # FIX 1: Updated the URL to Trichy
+    # URL updated to Trichy
     target_url = "https://in.bookmyshow.com/explore/movies-trichy"
-    proxy_url = f"https://api.webscraping.ai/html?api_key={API_KEY}&url={target_url}&proxy=residential&render=true&wait=10000"
+    
+    # Changed proxy=residential to proxy=stealth to bypass Cloudflare
+    proxy_url = f"https://api.webscraping.ai/html?api_key={API_KEY}&url={target_url}&proxy=stealth&render=true&wait=10000"
     
     movie_list = set() 
     try:
-        response = requests.get(proxy_url, timeout=45)
+        # Increased timeout to 60s because stealth proxies can take slightly longer
+        response = requests.get(proxy_url, timeout=60)
         
         if response.status_code == 200:
-            # FIX 2: Debugging checks to see WHY it is failing
-            
-            # Check if BookMyShow is throwing a CAPTCHA/Cloudflare block
+            # Debugging checks
             if "Just a moment..." in response.text or "Cloudflare" in response.text:
                 print("⚠️ ERROR: Blocked by BookMyShow Anti-bot (Cloudflare).")
                 return []
             
-            # Check if webscraping.ai API limit is reached
             if "error" in response.text.lower() and "api" in response.text.lower():
                 print(f"⚠️ API ERROR: {response.text}")
                 return []
 
-            # If no blocks, proceed to parse the HTML
+            # Proceed to parse if no blocks
             soup = BeautifulSoup(response.text, 'html.parser')
             
-            # Extract movie titles
             for h3 in soup.find_all('h3'):
                 name = h3.get_text().strip().upper()
                 if 2 < len(name) < 50:
@@ -42,7 +41,6 @@ def get_trichy_movies():
                     if not any(x in name for x in blacklist):
                         movie_list.add(name)
                         
-            # If the list is still empty, BookMyShow might have changed their HTML structure
             if not movie_list:
                 print("⚠️ WARNING: Page loaded, but no <h3> movie tags were found. Structure might have changed.")
                 
@@ -63,7 +61,7 @@ def run_all():
     meta = f"🕒 {time_str}\n━━━━━━━━━━━━━━━━━━━━\n"
     
     if not movies:
-        body = "⚠️ *Status:* No movies detected. (Possible API Block)\n"
+        body = "⚠️ *Status:* No movies detected. (Possible API Block or Empty List)\n"
     else:
         body = "🎥 *NOW SHOWING:*\n\n"
         for m in movies:
