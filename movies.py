@@ -10,39 +10,51 @@ USER_FILE = "users.json"
 MY_ID = 8095698350  # Unga permanent ID
 
 def get_trichy_movies():
-    # URL updated to Trichy
     target_url = "https://in.bookmyshow.com/explore/movies-trichy"
-    
-    # Changed proxy=residential to proxy=stealth to bypass Cloudflare
+    # Using stealth proxy to avoid Cloudflare blocks
     proxy_url = f"https://api.webscraping.ai/html?api_key={API_KEY}&url={target_url}&proxy=stealth&render=true&wait=10000"
     
-    movie_list = set() 
+    raw_movies = set()
+    final_movies = set()
+    
     try:
-        # Increased timeout to 60s because stealth proxies can take slightly longer
         response = requests.get(proxy_url, timeout=60)
         
         if response.status_code == 200:
-            # Debugging checks
             if "Just a moment..." in response.text or "Cloudflare" in response.text:
                 print("⚠️ ERROR: Blocked by BookMyShow Anti-bot (Cloudflare).")
                 return []
             
-            if "error" in response.text.lower() and "api" in response.text.lower():
-                print(f"⚠️ API ERROR: {response.text}")
-                return []
-
-            # Proceed to parse if no blocks
             soup = BeautifulSoup(response.text, 'html.parser')
             
+            # STRATEGY 1: Find movie names from image 'alt' tags inside movie links (Most reliable for BMS)
+            for a in soup.find_all('a', href=True):
+                if '/movies/' in a['href'] and 'ET00' in a['href']:
+                    img = a.find('img')
+                    if img and img.get('alt'):
+                        raw_movies.add(img.get('alt').strip().upper())
+            
+            # STRATEGY 2: Fallback to h3 tags just in case
             for h3 in soup.find_all('h3'):
-                name = h3.get_text().strip().upper()
+                raw_movies.add(h3.get_text().strip().upper())
+                
+            # STRATEGY 3: Fallback to prominent divs inside movie links
+            for a in soup.find_all('a', href=True):
+                if '/movies/' in a['href'] and 'ET00' in a['href']:
+                    texts = [div.get_text().strip().upper() for div in a.find_all('div') if div.get_text().strip()]
+                    if texts:
+                        raw_movies.add(texts[0]) # Usually the first text is the title
+
+            # Filter and clean the scraped list
+            blacklist = ["BOOKING", "TICKET", "WATCH", "CLICK", "OFFER", "LATEST", "BMS", "SCREEN", "PROMOTED", "ADVERTISEMENT", "RUPEES"]
+            
+            for name in raw_movies:
                 if 2 < len(name) < 50:
-                    blacklist = ["BOOKING", "TICKET", "WATCH", "CLICK", "OFFER", "LATEST", "BMS", "SCREEN"]
                     if not any(x in name for x in blacklist):
-                        movie_list.add(name)
+                        final_movies.add(name)
                         
-            if not movie_list:
-                print("⚠️ WARNING: Page loaded, but no <h3> movie tags were found. Structure might have changed.")
+            if not final_movies:
+                print("⚠️ WARNING: Page loaded, but no movie names could be extracted. DOM might be completely different.")
                 
         else:
             print(f"⚠️ Scraper Error: HTTP Status Code {response.status_code}")
@@ -50,7 +62,7 @@ def get_trichy_movies():
     except Exception as e:
         print(f"⚠️ Network/Scraper Error: {e}")
         
-    return sorted(list(movie_list))
+    return sorted(list(final_movies))
 
 def run_all():
     movies = get_trichy_movies()
