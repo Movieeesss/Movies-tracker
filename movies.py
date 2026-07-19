@@ -15,6 +15,7 @@ def get_movie_showtimes():
     proxy_url = f"https://api.webscraping.ai/html?api_key={API_KEY}&url={TARGET_URL}&proxy=stealth&render=true&wait=10000"
     
     theater_data = []
+    seen_theaters = set()
     
     try:
         print(f"Scraping data for {MOVIE_NAME} on {TARGET_DATE}...")
@@ -27,37 +28,43 @@ def get_movie_showtimes():
             
             soup = BeautifulSoup(response.text, 'html.parser')
             
-            # FIX: Isolate exact theater rows and ignore hidden sidebar menus
+            # Find all theater links
             venue_links = soup.find_all('a', href=re.compile(r'/cinemas/|/venue/', re.I))
             
             for a in venue_links:
                 theater_name = a.get_text().strip()
-                if len(theater_name) < 3: 
+                if len(theater_name) < 3 or theater_name in seen_theaters: 
                     continue
                 
-                # Navigate up to find the exact row container for THIS specific theater
-                parent = a.parent
+                current = a.parent
                 valid_container = None
                 
-                for _ in range(4): # Typically the row wrapper is 3-4 levels up
-                    if parent:
-                        times_in_parent = parent.find_all(text=re.compile(r'\d{2}:\d{2} [AP]M'))
-                        if times_in_parent:
-                            valid_container = parent
-                            break
-                        parent = parent.parent
+                # Smart DOM Walker: Walk up the HTML tree to find the exact row
+                while current and current.name != 'body':
+                    # Search for times in current container
+                    times_found = current.find_all(text=re.compile(r'\d{2}:\d{2} [AP]M'))
+                    
+                    if times_found:
+                        # Safety check: Ensure we haven't gone too high and grabbed the whole page
+                        nested_theaters = current.find_all('a', href=re.compile(r'/cinemas/|/venue/', re.I))
+                        unique_theaters = set([nt.get_text().strip() for nt in nested_theaters if len(nt.get_text().strip()) > 2])
+                        
+                        if len(unique_theaters) <= 1:
+                            valid_container = current
+                            break # We found the perfect row!
+                        else:
+                            break # Went too high, stop looking
+                            
+                    current = current.parent
                         
                 if valid_container:
-                    # Extract times STRICTLY inside this specific row
-                    times = valid_container.find_all(text=re.compile(r'\d{2}:\d{2} [AP]M'))
-                    times = [t.strip() for t in times if t.strip()]
-                    times = list(dict.fromkeys(times))
+                    raw_times = valid_container.find_all(text=re.compile(r'\d{2}:\d{2} [AP]M'))
+                    times = [t.strip() for t in raw_times if t.strip()]
+                    times = list(dict.fromkeys(times)) # Remove duplicates
                     
-                    # Fix for copy-paste bug: Ignore huge containers that accidentally grab the whole page
-                    if times and len(times) <= 12: 
-                        entry = f"🏢 *{theater_name}*\n⌚ {', '.join(times)}"
-                        if entry not in theater_data:
-                            theater_data.append(entry)
+                    if times:
+                        theater_data.append(f"🏢 *{theater_name}*\n⌚ {', '.join(times)}")
+                        seen_theaters.add(theater_name)
 
         else:
             print(f"⚠️ Scraper Error: HTTP Status Code {response.status_code}")
