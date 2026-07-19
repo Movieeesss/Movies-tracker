@@ -9,7 +9,7 @@ MY_ID = 8095698350  # Unga permanent ID
 
 # Neenga thedura Movie & Date details
 MOVIE_NAME = "JANA NAYAGAN"
-TARGET_DATE = "20260724" # Date-ah YYYYMMDD format la inga mathikalam (e.g., 20260725)
+TARGET_DATE = "20260724" # Date-ah YYYYMMDD format la mathikonga
 TARGET_URL = f"https://in.bookmyshow.com/movies/trichy/jana-nayagan/buytickets/ET00430817/{TARGET_DATE}"
 
 def get_movie_showtimes():
@@ -28,30 +28,42 @@ def get_movie_showtimes():
             
             soup = BeautifulSoup(response.text, 'html.parser')
             
-            # Find all theater blocks
-            theater_blocks = soup.find_all('li', class_=re.compile(r'list', re.I))
-            
-            for block in theater_blocks:
-                # Get Theater Name
-                theater_name_tag = block.find('a', class_=re.compile(r'venue', re.I))
-                if theater_name_tag:
-                    theater_name = theater_name_tag.get_text().strip()
+            # STRATEGY 1: Extract using BookMyShow's standard 'data-name' attribute
+            venues = soup.find_all('li', {'data-name': True})
+            if venues:
+                for venue in venues:
+                    theater_name = venue.get('data-name', '').strip()
                     
-                    # Get Showtimes (AM/PM pattern search)
-                    timings = []
-                    time_tags = block.find_all('div', text=re.compile(r'\d{2}:\d{2} [AP]M'))
-                    for t in time_tags:
-                        timings.append(t.get_text().strip())
+                    # Search for time buttons
+                    time_tags = venue.find_all('a', {'data-display-showtime': True})
+                    timings = [a.get_text().strip() for a in time_tags]
                     
-                    # Sometimes showtimes are nested in specific links, alternative extraction:
                     if not timings:
-                        time_links = block.find_all('a', {'data-display-showtime': True})
-                        for t in time_links:
-                            timings.append(t['data-display-showtime'].strip())
-                            
+                        # Fallback time extraction inside this venue
+                        time_elements = venue.find_all(text=re.compile(r'\d{2}:\d{2} [AP]M'))
+                        timings = [t.strip() for t in time_elements]
+                    
                     if theater_name and timings:
                         theater_data.append(f"🏢 *{theater_name}*\n⌚ {', '.join(timings)}")
                         
+            # STRATEGY 2: If Strategy 1 fails, search the DOM dynamically for typical venue classes
+            if not theater_data:
+                for venue_container in soup.find_all(['div', 'li'], class_=re.compile(r'venue|cinema|list', re.I)):
+                    name_tag = venue_container.find(['a', 'div', 'strong'], class_=re.compile(r'name|title|venue', re.I))
+                    if name_tag:
+                        theater_name = name_tag.get_text().strip()
+                        
+                        # Use regex to find any AM/PM text within this block
+                        time_elements = venue_container.find_all(['div', 'a', 'span'], text=re.compile(r'\d{2}:\d{2} [AP]M'))
+                        timings = [t.get_text().strip() for t in time_elements]
+                        
+                        # Avoid garbage text and ensure valid timings exist
+                        if theater_name and len(theater_name) > 3 and timings:
+                            theater_data.append(f"🏢 *{theater_name}*\n⌚ {', '.join(timings)}")
+            
+            # Remove any potential duplicate entries
+            theater_data = list(dict.fromkeys(theater_data))
+
         else:
             print(f"⚠️ Scraper Error: HTTP Status Code {response.status_code}")
             
@@ -72,7 +84,7 @@ def run_all():
     if theaters is None:
         body = "⚠️ *Status:* Error fetching data (Possible API Block).\n"
     elif len(theaters) == 0:
-        body = "⚠️ *Status:* No theaters showing this movie on the selected date.\n"
+        body = "⚠️ *Status:* No theaters showing this movie on the selected date. (Structure mismatch or no shows)\n"
     else:
         body = ""
         for t in theaters:
@@ -82,7 +94,7 @@ def run_all():
     final_msg = header + meta + body + footer
 
     try:
-        print("Sending to Telegram...")
+        print("Sending message to Telegram...")
         requests.post(
             f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
             data={
@@ -92,7 +104,7 @@ def run_all():
                 "disable_web_page_preview": "true" 
             }
         )
-        print("✅ Message sent successfully!")
+        print("✅ Message successfully sent to Telegram!")
     except Exception as e: 
         print(f"Telegram Error: {e}")
 
