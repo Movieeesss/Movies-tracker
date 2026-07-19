@@ -19,6 +19,7 @@ def get_movie_showtimes():
     
     try:
         print(f"Scraping data for {MOVIE_NAME} on {TARGET_DATE}...")
+        # Timeout 60 to give the stealth proxy enough time to render JS
         response = requests.get(proxy_url, timeout=60)
         
         if response.status_code == 200:
@@ -28,40 +29,36 @@ def get_movie_showtimes():
             
             soup = BeautifulSoup(response.text, 'html.parser')
             
-            # STRATEGY 1: Extract using BookMyShow's standard 'data-name' attribute
-            venues = soup.find_all('li', {'data-name': True})
-            if venues:
-                for venue in venues:
-                    theater_name = venue.get('data-name', '').strip()
-                    
-                    # Search for time buttons
-                    time_tags = venue.find_all('a', {'data-display-showtime': True})
-                    timings = [a.get_text().strip() for a in time_tags]
-                    
-                    if not timings:
-                        # Fallback time extraction inside this venue
-                        time_elements = venue.find_all(text=re.compile(r'\d{2}:\d{2} [AP]M'))
-                        timings = [t.strip() for t in time_elements]
-                    
-                    if theater_name and timings:
-                        theater_data.append(f"🏢 *{theater_name}*\n⌚ {', '.join(timings)}")
-                        
-            # STRATEGY 2: If Strategy 1 fails, search the DOM dynamically for typical venue classes
-            if not theater_data:
-                for venue_container in soup.find_all(['div', 'li'], class_=re.compile(r'venue|cinema|list', re.I)):
-                    name_tag = venue_container.find(['a', 'div', 'strong'], class_=re.compile(r'name|title|venue', re.I))
-                    if name_tag:
-                        theater_name = name_tag.get_text().strip()
-                        
-                        # Use regex to find any AM/PM text within this block
-                        time_elements = venue_container.find_all(['div', 'a', 'span'], text=re.compile(r'\d{2}:\d{2} [AP]M'))
-                        timings = [t.get_text().strip() for t in time_elements]
-                        
-                        # Avoid garbage text and ensure valid timings exist
-                        if theater_name and len(theater_name) > 3 and timings:
-                            theater_data.append(f"🏢 *{theater_name}*\n⌚ {', '.join(timings)}")
+            # 🚀 NEW MASTER STRATEGY: Find theater by its URL link (/cinemas/)
+            # BookMyShow always links the theater name to its info page
+            venue_links = soup.find_all('a', href=re.compile(r'/cinemas/|/venue/', re.I))
             
-            # Remove any potential duplicate entries
+            for a in venue_links:
+                theater_name = a.get_text().strip()
+                
+                # Navigate up the HTML tree to find the box containing this theater
+                # Usually it's within 2-4 parent tags (li or div)
+                container = a.find_parent(['li', 'div'], class_=re.compile(r'list|wrap|venue|container', re.I))
+                
+                # If regex class fails, just jump up 3 levels generic way
+                if not container:
+                    try:
+                        container = a.parent.parent.parent 
+                    except:
+                        continue
+                
+                if container:
+                    # Find all AM/PM timings inside this specific theater's box
+                    times = container.find_all(text=re.compile(r'\d{2}:\d{2} [AP]M'))
+                    times = [t.strip() for t in times if t.strip()]
+                    
+                    # Remove duplicates if any
+                    times = list(dict.fromkeys(times))
+                    
+                    if theater_name and len(theater_name) > 3 and times:
+                        theater_data.append(f"🏢 *{theater_name}*\n⌚ {', '.join(times)}")
+            
+            # Remove any overall duplicate theaters
             theater_data = list(dict.fromkeys(theater_data))
 
         else:
