@@ -10,7 +10,7 @@ USER_FILE = "users.json"
 MY_ID = 8095698350  # Unga permanent ID
 
 def get_trichy_movies():
-    target_url = "https://in.bookmyshow.com/explore/movies-trichy"
+    target_url = "https://in.bookmyshow.com/explore/movies-coimbatore"
     proxy_url = f"https://api.webscraping.ai/html?api_key={API_KEY}&url={target_url}&proxy=residential&render=true&wait=10000"
     
     movie_list = set() 
