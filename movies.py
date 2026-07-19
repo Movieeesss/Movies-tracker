@@ -5,11 +5,10 @@ from datetime import datetime
 
 TOKEN = "8825463319:AAH285s09kaeYMTXsPCEd41gjiTA-GQbL7g"
 API_KEY = "e8c9eac3-517e-4e74-aa41-5ab98dc3e139"
-MY_ID = 8095698350  # Unga permanent ID
+MY_ID = 8095698350  
 
-# Neenga thedura Movie & Date details
 MOVIE_NAME = "JANA NAYAGAN"
-TARGET_DATE = "20260724" # Date-ah YYYYMMDD format la mathikonga
+TARGET_DATE = "20260724" 
 TARGET_URL = f"https://in.bookmyshow.com/movies/trichy/jana-nayagan/buytickets/ET00430817/{TARGET_DATE}"
 
 def get_movie_showtimes():
@@ -19,47 +18,46 @@ def get_movie_showtimes():
     
     try:
         print(f"Scraping data for {MOVIE_NAME} on {TARGET_DATE}...")
-        # Timeout 60 to give the stealth proxy enough time to render JS
         response = requests.get(proxy_url, timeout=60)
         
         if response.status_code == 200:
             if "Just a moment..." in response.text or "Cloudflare" in response.text:
-                print("⚠️ ERROR: Blocked by BookMyShow Anti-bot (Cloudflare).")
+                print("⚠️ ERROR: Blocked by Anti-bot.")
                 return None
             
             soup = BeautifulSoup(response.text, 'html.parser')
             
-            # 🚀 NEW MASTER STRATEGY: Find theater by its URL link (/cinemas/)
-            # BookMyShow always links the theater name to its info page
+            # FIX: Isolate exact theater rows and ignore hidden sidebar menus
             venue_links = soup.find_all('a', href=re.compile(r'/cinemas/|/venue/', re.I))
             
             for a in venue_links:
                 theater_name = a.get_text().strip()
+                if len(theater_name) < 3: 
+                    continue
                 
-                # Navigate up the HTML tree to find the box containing this theater
-                # Usually it's within 2-4 parent tags (li or div)
-                container = a.find_parent(['li', 'div'], class_=re.compile(r'list|wrap|venue|container', re.I))
+                # Navigate up to find the exact row container for THIS specific theater
+                parent = a.parent
+                valid_container = None
                 
-                # If regex class fails, just jump up 3 levels generic way
-                if not container:
-                    try:
-                        container = a.parent.parent.parent 
-                    except:
-                        continue
-                
-                if container:
-                    # Find all AM/PM timings inside this specific theater's box
-                    times = container.find_all(text=re.compile(r'\d{2}:\d{2} [AP]M'))
+                for _ in range(4): # Typically the row wrapper is 3-4 levels up
+                    if parent:
+                        times_in_parent = parent.find_all(text=re.compile(r'\d{2}:\d{2} [AP]M'))
+                        if times_in_parent:
+                            valid_container = parent
+                            break
+                        parent = parent.parent
+                        
+                if valid_container:
+                    # Extract times STRICTLY inside this specific row
+                    times = valid_container.find_all(text=re.compile(r'\d{2}:\d{2} [AP]M'))
                     times = [t.strip() for t in times if t.strip()]
-                    
-                    # Remove duplicates if any
                     times = list(dict.fromkeys(times))
                     
-                    if theater_name and len(theater_name) > 3 and times:
-                        theater_data.append(f"🏢 *{theater_name}*\n⌚ {', '.join(times)}")
-            
-            # Remove any overall duplicate theaters
-            theater_data = list(dict.fromkeys(theater_data))
+                    # Fix for copy-paste bug: Ignore huge containers that accidentally grab the whole page
+                    if times and len(times) <= 12: 
+                        entry = f"🏢 *{theater_name}*\n⌚ {', '.join(times)}"
+                        if entry not in theater_data:
+                            theater_data.append(entry)
 
         else:
             print(f"⚠️ Scraper Error: HTTP Status Code {response.status_code}")
@@ -72,16 +70,15 @@ def get_movie_showtimes():
 def run_all():
     theaters = get_movie_showtimes()
     
-    # Format the Date for Display (e.g., 20260724 -> 24-07-2026)
     display_date = f"{TARGET_DATE[6:8]}-{TARGET_DATE[4:6]}-{TARGET_DATE[0:4]}"
     
     header = f"🎬 *{MOVIE_NAME} - SHOWTIMES* 🎬\n"
     meta = f"📅 *Date:* {display_date}\n📍 *Location:* Trichy\n━━━━━━━━━━━━━━━━━━━━\n\n"
     
     if theaters is None:
-        body = "⚠️ *Status:* Error fetching data (Possible API Block).\n"
+        body = "⚠️ *Status:* Error fetching data.\n"
     elif len(theaters) == 0:
-        body = "⚠️ *Status:* No theaters showing this movie on the selected date. (Structure mismatch or no shows)\n"
+        body = "⚠️ *Status:* No theaters showing this movie yet.\n"
     else:
         body = ""
         for t in theaters:
@@ -94,14 +91,9 @@ def run_all():
         print("Sending message to Telegram...")
         requests.post(
             f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
-            data={
-                "chat_id": MY_ID, 
-                "text": final_msg, 
-                "parse_mode": "Markdown", 
-                "disable_web_page_preview": "true" 
-            }
+            data={"chat_id": MY_ID, "text": final_msg, "parse_mode": "Markdown", "disable_web_page_preview": "true"}
         )
-        print("✅ Message successfully sent to Telegram!")
+        print("✅ Success!")
     except Exception as e: 
         print(f"Telegram Error: {e}")
 
